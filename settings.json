@@ -1,0 +1,10 @@
+{
+  "isTestnet": false,
+  "key": "RL2rh4rX3UnDHrSe8b",
+  "secretKey": "bDmBP7c8GiqfAGjDAyK6PlTZA31stKUyab3B",
+  "buyPrice": 1.0000,
+  "sellPrice": 2.0000,
+  "tradeAmount": 10,
+  "orderCount": 1,
+  "symbol": "USDCUSDT"
+}
