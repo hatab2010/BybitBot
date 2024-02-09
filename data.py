@@ -8,8 +8,8 @@ class Setting:
     isTestnet: bool
     key: str
     secretKey: str
-    buyPrice: float
-    sellPrice: float
+    buyPrice: Decimal
+    sellPrice: Decimal
     tradeAmount: int
     orderCount: int
     symbol: str
@@ -19,8 +19,8 @@ class Setting:
         _isTestnet = bool(obj.get("isTestnet"))
         _key = str(obj.get("key"))
         _secretKey = str(obj.get("secretKey"))
-        _buyPrice = float(obj.get("buyPrice"))
-        _sellPrice = float(obj.get("sellPrice"))
+        _buyPrice = Decimal(obj.get("buyPrice"))
+        _sellPrice = Decimal(obj.get("sellPrice"))
         _tradeAmount = int(obj.get("tradeAmount"))
         _orderCount = int(obj.get("orderCount"))
         _symbol = str(obj.get("symbol"))

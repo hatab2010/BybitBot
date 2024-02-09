@@ -57,13 +57,14 @@ class BybitClient:
         pass
 
     def place_order(self, symbol: str, side: str, qty: int, price: float) -> RestResponse:
+        price = f"{price:.4f}"
         responce = self.__session.place_order(
             category="spot",
             symbol=symbol,
             side=side,
             orderType="Limit",
             qty=qty,
-            price=f"{price:.4f}",
+            price=price,
             timeInForce="GTC"
         )
 

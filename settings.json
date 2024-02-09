@@ -2,9 +2,9 @@
   "isTestnet": false,
   "key": "RL2rh4rX3UnDHrSe8b",
   "secretKey": "bDmBP7c8GiqfAGjDAyK6PlTZA31stKUyab3B",
-  "buyPrice": 1.0000,
-  "sellPrice": 2.0000,
-  "tradeAmount": 10,
-  "orderCount": 1,
+  "buyPrice": 0.9998,
+  "sellPrice": 0.9999,
+  "tradeAmount": 1,
+  "orderCount": 5,
   "symbol": "USDCUSDT"
 }
