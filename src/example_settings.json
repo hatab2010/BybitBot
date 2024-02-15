@@ -1,0 +1,13 @@
+{
+  "isTestnet": false,
+  "key": "",
+  "secretKey": "",
+  "sellPrice": 0.9998,
+  "buyPrice": 0.9997,
+  "allowTopPrice": 0.9999,
+  "allowBottomPrice": 0.9992,
+  "tradeAmount": 1,
+  "orderCount": 3,
+  "triggerDuration": 3,
+  "symbol": "USDCUSDT"
+}
