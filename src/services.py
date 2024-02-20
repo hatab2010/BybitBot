@@ -231,9 +231,6 @@ class BybitBotService:
         return len(buy_orders)
 
     def __downgrade_sell_order(self):
-        if self.__isDowngrade: #TODO временное ограничение на понижение цены ордера
-            return
-
         sell_orders = [order for order in self.__open_orders if order.side == Side.Sell]
 
         for order in sell_orders:
