@@ -1,6 +1,5 @@
-from decimal import Decimal
-from time import sleep
 import json
+from time import sleep
 from data import Setting
 from models import BybitClient
 from src.services import BybitBotService, Range, TimeRangeTrigger
@@ -40,7 +39,8 @@ trade_bot = BybitBotService(
 )
 
 trade_bot.set_symbol(settings.symbol)
-trade_bot.start(settings.tradeAmount)
+sleep(3)
+trade_bot.start(settings.orderCount)
 
 while True:
     sleep(1)

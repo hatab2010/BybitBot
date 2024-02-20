@@ -167,8 +167,10 @@ class BybitBotService:
         self.__qty = qty
         self.__trigger = trigger
         self.__trigger.triggered = self.__triggered
+        self.__isDowngrade = False
 
         client.order_callback = self.__order_callback
+        client.subscribe = self.__subscribe
 
     def set_symbol(self, symbol: str):
         tick_size = self.__client.get_instrument_info(symbol).list[0].priceFilter.tick_size
@@ -187,6 +189,12 @@ class BybitBotService:
             )
 
             self.__open_orders.append(open_order)
+
+    def __subscribe(self):
+        print("validate orders")
+        for order in self.__open_orders:
+            ctx_order = self.__client.get_order_history(order_id=order.orderId)
+            self.__order_callback([ctx_order])
 
     def __triggered(self, side: Side):
         is_outside_bottom = self.__allow_range.bottom > self.__trade_range.bottom
@@ -223,6 +231,9 @@ class BybitBotService:
         return len(buy_orders)
 
     def __downgrade_sell_order(self):
+        if self.__isDowngrade: #TODO временное ограничение на понижение цены ордера
+            return
+
         sell_orders = [order for order in self.__open_orders if order.side == Side.Sell]
 
         for order in sell_orders:
@@ -233,6 +244,8 @@ class BybitBotService:
                 order.orderId,
                 order.price
             )
+
+        self.__isDowngrade = True
 
     def __order_callback(self, orders: list[Order]):
         for order in orders:
@@ -262,6 +275,6 @@ class BybitBotService:
 
     def __ticker_callback(self, response: TickerResponse):
         lastPrice = response.data.lastPrice
-        print(f"{datetime.now()}: {self.__symbol_info.symbol} price {lastPrice}")
+        # print(f"{datetime.now()}: {self.__symbol_info.symbol} price {lastPrice}")
         self.__trigger.push(Decimal(lastPrice))
         self.__symbol_info.last_price = lastPrice

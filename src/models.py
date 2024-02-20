@@ -6,6 +6,7 @@ from data import Order, RestResponse, InstrumentInfo, TickerResponse, WebsocketR
 
 class BybitClient:
     order_callback: Callable[[list[Order]], None]
+    subscribe: Callable
 
     __websocket_callback: Callable[[str], None]
     __ticker_callback: Callable[[TickerResponse], None]
@@ -43,8 +44,8 @@ class BybitClient:
             api_secret=self.__secret_key,
             trace_logging=True,
             retries=30,
-            ping_interval=20,
-            ping_timeout=10,
+            ping_interval=30,   #20
+            ping_timeout=20,  #10
             restart_on_error=True,
             private_auth_expire=1,
             callback_function=self.__websocket_handler
@@ -54,7 +55,13 @@ class BybitClient:
 
     def __websocket_handler(self, message: dict):
         print("--websocket_callback--")
-        print("message")
+        print(message)
+
+        try:
+            if message["op"] == "subscribe" and message["success"] is True:
+                self.subscribe()
+        except:
+            pass
 
         try:
             response = WebsocketResponse.from_dict(message)
@@ -62,6 +69,15 @@ class BybitClient:
                 self.order_callback(response.data)
         except Exception as ex:
             print(ex)
+
+    def get_order_history(self, order_id:str):
+        response = self.__session.get_order_history(
+            category="spot",
+            limit=1,
+            orderId=order_id
+        )
+        response = RestResponse.from_dict(response)
+        return Order.from_dict(response.result["list"][0])
 
     def get_instrument_info(self, symbol) -> InstrumentInfo:
         response = self.__session.get_instruments_info(
@@ -88,15 +104,19 @@ class BybitClient:
         )
 
     def amend_order(self, symbol: str, order_id: str, price: Decimal):
-        self.__session.amend_order(
+        response = self.__session.amend_order(
             category="spot",
             symbol=symbol,
             orderId=order_id,
-            price=price.quantize(Decimal("1.0000"), ROUND_HALF_UP) #TODO заплатка. Необходима проверка на минимальный tick size
+            price=price
         )
+        response = RestResponse.from_dict(response)
+        if response.retCode != 0:
+            raise Exception(f"Ошибка изменения ордера {response.retMsg}")
+
+        print(f"(amend order) {response.result}")
 
     def place_order(self, symbol: str, side: str, qty: int, price: Decimal) -> Order:
-        price = f"{price:.4f}" #TODO Сделать округление числа до значимых знаков в соответствии с tickSize пары
         response = self.__session.place_order(
             category="spot",
             symbol=symbol,
@@ -113,9 +133,10 @@ class BybitClient:
         response.result["symbol"] = symbol
 
         if response.retCode != 0:
-            raise Exception
-        else:
-            return Order.from_dict(response.result)
+            raise Exception(f"ошибка создания ордера + {response.retMsg}")
+
+        print(f"(place order) {response.result}")
+        return Order.from_dict(response.result)
 
     def __ticker_handler(self, message: dict):
         #TODO добавить обработку исключений. Написать класс для handler
