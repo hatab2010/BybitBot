@@ -197,52 +197,41 @@ class BybitBotService:
             self.__order_callback([ctx_order])
 
     def __triggered(self, side: Side):
+        print(f"TRIGGER t:{datetime.now()}")
         is_outside_bottom = self.__allow_range.bottom > self.__trade_range.bottom
         is_outside_top = self.__allow_range.top < self.__trade_range.top
 
-        # TODO Изменить метод проверки
         if is_outside_bottom or is_outside_top:
             print("Outside in allow price range")
             return
 
         if side == Side.Buy:
             self.__trade_range.offset(1)
-            self.__upgrade_buy_order()
-
-        if side == Side.Sell:
-            self.__downgrade_sell_order()
+        else:
             self.__trade_range.offset(-1)
 
+        self.__refresh_orders(side)
         self.__trigger.set_range(self.__trade_range)
 
-    def __upgrade_buy_order(self) -> int:
-        buy_orders = [order for order in self.__open_orders if order.side == Side.Buy]
+    def __refresh_orders(self, side: Side):
+        refresh_orders = [order for order in self.__open_orders if order.side == side]
 
-        for order in buy_orders:
-            order.price = self.__trade_range.bottom
-            # self.__client.remove_order(order.symbol, order.orderId)
-            self.__client.amend_order(
-                order.symbol,
-                order.orderId,
-                order.price
-            )
-            # self.__open_orders.remove(order)
+        if side == Side.Buy:
+            price = self.__trade_range.bottom
+        else:
+            price = self.__trade_range.top
 
-        return len(buy_orders)
-
-    def __downgrade_sell_order(self):
-        sell_orders = [order for order in self.__open_orders if order.side == Side.Sell]
-
-        for order in sell_orders:
-            order.price = self.__trade_range.bottom
-
-            self.__client.amend_order(
-                order.symbol,
-                order.orderId,
-                order.price
-            )
-
-        self.__isDowngrade = True
+        for order in refresh_orders:
+            try:
+                self.__client.amend_order(
+                    order.symbol,
+                    order.orderId,
+                    price
+                )
+                order.price = price
+            except Exception as ex:
+                print(ex)
+                # self.__open_orders.remove(order)
 
     def __order_callback(self, orders: list[Order]):
         for order in orders:

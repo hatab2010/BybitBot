@@ -70,7 +70,7 @@ class BybitClient:
         except Exception as ex:
             print(ex)
 
-    def get_order_history(self, order_id:str):
+    def get_order_history(self, order_id: str):
         response = self.__session.get_order_history(
             category="spot",
             limit=1,

@@ -8,18 +8,20 @@ from src.services import BybitBotService, Range, TimeRangeTrigger
 with open("src/settings.json", "r") as file:
     settingText = file.read()
 settings = Setting.from_dict(json.loads(settingText))
-
+client = BybitClient(
+        is_testnet=settings.isTestnet,
+        key=settings.key,
+        secret_key=settings.secretKey
+)
 trade_range = Range(
     top=settings.sellPrice,
     bottom=settings.buyPrice
 )
-
 trade_trigger = TimeRangeTrigger(
     target_range=trade_range,
     trigger_duration=settings.triggerDuration,
     accept_height=trade_range.height
 )
-
 trade_bot = BybitBotService(
     qty=settings.tradeAmount,
     trade_range=Range(
@@ -27,11 +29,7 @@ trade_bot = BybitBotService(
         bottom=settings.buyPrice
     ),
     trigger=trade_trigger,
-    client=BybitClient(
-        is_testnet=settings.isTestnet,
-        key=settings.key,
-        secret_key=settings.secretKey
-    ),
+    client=client,
     allow_range=Range(
         top=settings.allowTopPrice,
         bottom=settings.allowBottomPrice
@@ -41,6 +39,5 @@ trade_bot = BybitBotService(
 trade_bot.set_symbol(settings.symbol)
 sleep(3)
 trade_bot.start(settings.orderCount)
-
 while True:
     sleep(1)
