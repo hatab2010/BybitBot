@@ -33,7 +33,8 @@ trade_bot = BybitBotService(
     allow_range=Range(
         top=settings.allowTopPrice,
         bottom=settings.allowBottomPrice
-    )
+    ),
+    overlap_top_price=settings.overlapSellPrice
 )
 
 trade_bot.set_symbol(settings.symbol)

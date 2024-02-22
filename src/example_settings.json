@@ -6,6 +6,7 @@
   "buyPrice": 0.9997,
   "allowTopPrice": 0.9999,
   "allowBottomPrice": 0.9992,
+  "overlapSellPrice": 1.0007,
   "tradeAmount": 1,
   "orderCount": 3,
   "triggerDuration": 3,

@@ -67,7 +67,7 @@ class TimeRangeTrigger:
     def __init__(
             self,
             target_range: Range,
-            accept_height: Decimal, #TODO дополнрительный параметр
+            accept_height: Decimal,  # TODO дополнрительный параметр
             trigger_duration: int
     ):
         self.__timer = None
@@ -115,7 +115,7 @@ class TimeRangeTrigger:
             print("TRIGGER STOP")
 
     def __trigger(self):
-        average_price = sum(self.__values)/len(self.__values)
+        average_price = sum(self.__values) / len(self.__values)
 
         if self.__side == Side.Buy:
             offset_top = self.__top_range.top - average_price
@@ -154,6 +154,7 @@ class BybitBotService:
     __client: BybitClient
     __open_orders: list[Order] = list()
     __trigger_time: int
+    __is_overlap_top: bool
 
     def __init__(
             self,
@@ -161,7 +162,8 @@ class BybitBotService:
             trade_range: Range,
             qty: int,
             trigger: TimeRangeTrigger,
-            allow_range: Range
+            allow_range: Range,
+            overlap_top_price: Decimal
     ):
         self.__allow_range = allow_range
         self.__client = client
@@ -169,6 +171,8 @@ class BybitBotService:
         self.__qty = qty
         self.__trigger = trigger
         self.__isDowngrade = False
+        self.__overlap_top_price = overlap_top_price
+        self.__is_overlap_top = self.__allow_range.top == self.__trade_range.top
 
         trigger.triggered = self.__triggered
         client.order_callback = self.__order_callback
@@ -201,7 +205,7 @@ class BybitBotService:
     def __triggered(self, side: Side):
         print(f"TRIGGER t:{datetime.now()}")
         is_outside_bottom = self.__allow_range.bottom > self.__trade_range.bottom
-        is_outside_top = self.__allow_range.top < self.__trade_range.top
+        is_outside_top = self.__trade_range.top > self.__allow_range.top
 
         if is_outside_bottom or is_outside_top:
             print("Outside in allow price range")
@@ -211,6 +215,8 @@ class BybitBotService:
             self.__trade_range.offset(1)
         else:
             self.__trade_range.offset(-1)
+
+        self.__is_overlap_top = self.__allow_range.top == self.__trade_range.top
 
         self.__refresh_orders(side)
         self.__trigger.set_range(self.__trade_range)
@@ -245,9 +251,15 @@ class BybitBotService:
 
                 self.__open_orders.remove(ctx_order)
 
+                # Выполнен ордер на закупку
                 if order.side == Side.Buy:
-                    ctx_price = self.__trade_range.top
+                    # Меняем цену продажи на верхней границе торгового коридора
+                    if self.__is_overlap_top:
+                        ctx_price = self.__overlap_top_price
+                    else:
+                        ctx_price = self.__trade_range.top
                     ctx_side = Side.Sell.value
+                # Выполнен ордер на продажу
                 else:
                     ctx_price = self.__trade_range.bottom
                     ctx_side = Side.Buy.value
