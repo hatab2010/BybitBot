@@ -106,11 +106,13 @@ class TimeRangeTrigger:
                 self.__values.append(price)
                 self.__timer = Timer(self.__accept_duration, self.__trigger)
                 self.__timer.start()
+                print("TRIGGER START")
 
         is_outside_top_trigger_area = self.__side == Side.Buy and price < self.__top_range.bottom
         is_outside_bottom_trigger_area = self.__side == Side.Sell and price > self.__bottom_range.top
         if is_trigger_start and (is_outside_top_trigger_area or is_outside_bottom_trigger_area):
             self.__reset()
+            print("TRIGGER STOP")
 
     def __trigger(self):
         average_price = sum(self.__values)/len(self.__values)
@@ -166,9 +168,9 @@ class BybitBotService:
         self.__trade_range = trade_range
         self.__qty = qty
         self.__trigger = trigger
-        self.__trigger.triggered = self.__triggered
         self.__isDowngrade = False
 
+        trigger.triggered = self.__triggered
         client.order_callback = self.__order_callback
         client.subscribe = self.__subscribe
 
