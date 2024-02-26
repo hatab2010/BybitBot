@@ -174,16 +174,16 @@ class BybitBotService:
         self.__overlap_top_price = overlap_top_price
         self.__is_overlap_top = self.__allow_range.top == self.__trade_range.top
 
-        trigger.triggered = self.__triggered
-        client.order_callback = self.__order_callback
-        client.subscribe = self.__subscribe
+        trigger.triggered = self.__offset_trade_range
+        client.order_callback = self.__order_handler
+        client.subscribe = self.__validate_open_orders
 
     def set_symbol(self, symbol: str):
         tick_size = self.__client.get_instrument_info(symbol).list[0].priceFilter.tick_size
 
         self.__open_orders = list()
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
-        self.__client.ticker_stream(symbol, self.__ticker_callback)
+        self.__client.ticker_stream(symbol, self.__ticker_handler)
 
     def start(self, order_pool_count: int):
         for index in range(order_pool_count):
@@ -196,13 +196,16 @@ class BybitBotService:
 
             self.__open_orders.append(open_order)
 
-    def __subscribe(self):
+    def __validate_open_orders(self):
         print("validate orders")
         for order in self.__open_orders:
-            ctx_order = self.__client.get_order_history(order_id=order.orderId)
-            self.__order_callback([ctx_order])
+            try:
+                ctx_order = self.__client.get_order_history(order_id=order.orderId)
+                self.__order_handler([ctx_order])
+            except Exception as ex:
+                print(ex)
 
-    def __triggered(self, side: Side):
+    def __offset_trade_range(self, direction: Side):
         print(f"TRIGGER t:{datetime.now()}")
         is_outside_bottom = self.__allow_range.bottom > self.__trade_range.bottom
         is_outside_top = self.__trade_range.top > self.__allow_range.top
@@ -211,17 +214,17 @@ class BybitBotService:
             print("Outside in allow price range")
             return
 
-        if side == Side.Buy:
+        if direction == Side.Buy:
             self.__trade_range.offset(1)
         else:
             self.__trade_range.offset(-1)
 
         self.__is_overlap_top = self.__allow_range.top == self.__trade_range.top
 
-        self.__refresh_orders(side)
+        self.__update_orders(direction)
         self.__trigger.set_range(self.__trade_range)
 
-    def __refresh_orders(self, side: Side):
+    def __update_orders(self, side: Side):
         refresh_orders = [order for order in self.__open_orders if order.side == side]
 
         if side == Side.Buy:
@@ -241,7 +244,7 @@ class BybitBotService:
                 print(ex)
                 # self.__open_orders.remove(order)
 
-    def __order_callback(self, orders: list[Order]):
+    def __order_handler(self, orders: list[Order]):
         for order in orders:
             if order.orderStatus == OrderStatus.Filled:
                 ctx_order = next((item for item in self.__open_orders if item.orderId == order.orderId), None)
@@ -273,8 +276,7 @@ class BybitBotService:
 
                 self.__open_orders.append(open_order)
 
-    def __ticker_callback(self, response: TickerResponse):
+    def __ticker_handler(self, response: TickerResponse):
         lastPrice = response.data.lastPrice
-        # print(f"{datetime.now()}: {self.__symbol_info.symbol} price {lastPrice}")
         self.__trigger.push(Decimal(lastPrice))
         self.__symbol_info.last_price = lastPrice
