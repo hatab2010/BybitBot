@@ -156,7 +156,7 @@ class BybitClient:
         result["qty"] = qty
         result["symbol"] = symbol
 
-        print(f"(place order) {response.result}")
+        print(f"(place order) {result}")
         return Order.from_dict(result)
 
     def ticker_stream(self, symbol: str, callback: Callable[[TickerResponse], None]):

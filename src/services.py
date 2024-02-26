@@ -152,7 +152,7 @@ class BybitBotService:
     __symbol_info: SymbolInfo
     __ticker_socket: WebSocket
     __client: BybitClient
-    __open_orders: list[Order] = list()
+    __open_orders: list[Order]
     __trigger_time: int
     __is_overlap_top: bool
 
@@ -166,6 +166,7 @@ class BybitBotService:
             overlap_top_price: Decimal,
             symbol: str
     ):
+        self.__open_orders = list()
         self.__allow_range = allow_range
         self.__client = client
         self.__trade_range = trade_range
@@ -281,10 +282,6 @@ class BybitBotService:
                 )
 
                 self.__open_orders.append(open_order)
-
-    def __load_open_orders(self, symbol: str):
-        self.__client.get_order_history()
-        pass
 
     def __ticker_handler(self, response: TickerResponse):
         lastPrice = response.data.lastPrice

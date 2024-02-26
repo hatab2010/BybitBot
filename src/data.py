@@ -74,7 +74,8 @@ class Order:
         _orderIv = str(obj.get("orderIv"))
         _timeInForce = str(obj.get("timeInForce"))
         _orderStatus = str(obj.get("orderStatus"))
-        return Order(_symbol, _orderId, _side, _orderType, _cancelType, _price, _qty, _orderIv, _timeInForce, _orderStatus)
+        return Order(_symbol, _orderId, _side, _orderType, _cancelType, _price, _qty, _orderIv, _timeInForce,
+                     _orderStatus)
 
 
 @dataclass
@@ -172,7 +173,8 @@ class ListDatum:
         _lotSizeFilter = LotSizeFilter.from_dict(obj.get("lotSizeFilter"))
         _priceFilter = PriceFilter.from_dict(obj.get("priceFilter"))
         _riskParameters = RiskParameters.from_dict(obj.get("riskParameters"))
-        return ListDatum(_symbol, _baseCoin, _quoteCoin, _innovation, _status, _marginTrading, _lotSizeFilter, _priceFilter, _riskParameters)
+        return ListDatum(_symbol, _baseCoin, _quoteCoin, _innovation, _status, _marginTrading, _lotSizeFilter,
+                         _priceFilter, _riskParameters)
 
 
 @dataclass
@@ -210,7 +212,8 @@ class TickerData:
         _turnover24h = str(obj.get("turnover24h"))
         _price24hPcnt = str(obj.get("price24hPcnt"))
         _usdIndexPrice = str(obj.get("usdIndexPrice"))
-        return TickerData(_symbol, _lastPrice, _highPrice24h, _lowPrice24h, _prevPrice24h, _volume24h, _turnover24h, _price24hPcnt, _usdIndexPrice)
+        return TickerData(_symbol, _lastPrice, _highPrice24h, _lowPrice24h, _prevPrice24h, _volume24h, _turnover24h,
+                          _price24hPcnt, _usdIndexPrice)
 
 
 @dataclass
