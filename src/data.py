@@ -13,6 +13,7 @@ class Setting:
     sellPrice: Decimal
     allowTopPrice: Decimal
     allowBottomPrice: Decimal
+    overlapSellPrice: Decimal
     tradeAmount: int
     orderCount: int
     symbol: str
@@ -27,6 +28,7 @@ class Setting:
         _sellPrice = Decimal(str(obj.get("sellPrice")))
         _allowTopPrice = Decimal(str(obj.get("allowTopPrice")))
         _allowBottomPrice = Decimal(str(obj.get("allowBottomPrice")))
+        _overlapSellPrice = Decimal(str(obj.get("overlapSellPrice")))
         _tradeAmount = int(obj.get("tradeAmount"))
         _triggerDuration = int(obj.get("triggerDuration"))
         _orderCount = int(obj.get("orderCount"))
@@ -39,6 +41,7 @@ class Setting:
             _sellPrice,
             _allowTopPrice,
             _allowBottomPrice,
+            _overlapSellPrice,
             _tradeAmount,
             _orderCount,
             _symbol,
