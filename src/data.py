@@ -229,3 +229,17 @@ class TickerResponse:
         _cs = float(obj.get("cs"))
         _data = TickerData.from_dict(obj.get("data"))
         return TickerResponse(_topic, _ts, _type, _cs, _data)
+
+
+@dataclass
+class Book:
+    nextPageCursor: str
+    category: str
+    list: List[object]
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'Book':
+        _nextPageCursor = str(obj.get("nextPageCursor"))
+        _category = str(obj.get("category"))
+        _list = obj.get("list")
+        return Book(_nextPageCursor, _category, _list)

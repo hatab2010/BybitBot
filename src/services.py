@@ -163,7 +163,8 @@ class BybitBotService:
             qty: int,
             trigger: TimeRangeTrigger,
             allow_range: Range,
-            overlap_top_price: Decimal
+            overlap_top_price: Decimal,
+            symbol: str
     ):
         self.__allow_range = allow_range
         self.__client = client
@@ -177,6 +178,7 @@ class BybitBotService:
         trigger.triggered = self.__offset_trade_range
         client.order_callback = self.__order_handler
         client.subscribe = self.__validate_open_orders
+        self.set_symbol(symbol)
 
     def set_symbol(self, symbol: str):
         tick_size = self.__client.get_instrument_info(symbol).list[0].priceFilter.tick_size
@@ -185,16 +187,20 @@ class BybitBotService:
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
         self.__client.ticker_stream(symbol, self.__ticker_handler)
 
-    def start(self, order_pool_count: int):
-        for index in range(order_pool_count):
-            open_order = self.__client.place_order(
-                symbol=self.__symbol_info.symbol,
-                side=str(Side.Buy.value),
-                price=self.__trade_range.bottom,
-                qty=self.__qty
-            )
+    def set_orders_count(self, count: int):
+        self.__open_orders += self.__client.get_open_orders(self.__symbol_info.symbol)
+        need_to_create = count - len(self.__open_orders)
 
-            self.__open_orders.append(open_order)
+        if need_to_create > 0:
+            for index in range(need_to_create):
+                open_order = self.__client.place_order(
+                    symbol=self.__symbol_info.symbol,
+                    side=str(Side.Buy.value),
+                    price=self.__trade_range.bottom,
+                    qty=self.__qty
+                )
+
+                self.__open_orders.append(open_order)
 
     def __validate_open_orders(self):
         print("validate orders")
@@ -275,6 +281,10 @@ class BybitBotService:
                 )
 
                 self.__open_orders.append(open_order)
+
+    def __load_open_orders(self, symbol: str):
+        self.__client.get_order_history()
+        pass
 
     def __ticker_handler(self, response: TickerResponse):
         lastPrice = response.data.lastPrice

@@ -1,21 +1,36 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from pybit.unified_trading import HTTP, WebSocket
-from typing import Callable, Optional
-from data import Order, RestResponse, InstrumentInfo, TickerResponse, WebsocketResponse
+from typing import Callable, Optional, Any
+from data import Order, RestResponse, InstrumentInfo, TickerResponse, WebsocketResponse, Book
+import inspect
+
+
+class BybitHandler:
+    @staticmethod
+    def rest_handler(message: dict) -> Any:
+        response = RestResponse.from_dict(message)
+        call_function_name = inspect.currentframe().f_back.f_code.co_name
+        if response.retCode != 0:
+            raise Exception(f"[{call_function_name}] Ошибка запроса. Код: {response.retCode}. "
+                            f"\nСообщение: {response.retMsg}")
+
+        return response.result
 
 
 class BybitClient:
     order_callback: Callable[[list[Order]], None]
     subscribe: Callable
 
+    __category: str = "spot"
+
     __websocket_callback: Callable[[str], None]
-    __ticker_callback: Callable[[TickerResponse], None]
+    __ticker_callback: Optional[Callable[[TickerResponse], None]]
     __key: str
     __secret_key: str
-    __is_testnet: bool
     __session: HTTP
     __socket: WebSocket
     __ticker_socket: Optional[WebSocket]
+    __is_testnet: bool
 
     def __init__(
             self,
@@ -26,9 +41,10 @@ class BybitClient:
     ):
         # self.__websocket_callback = websocket_callback
         self.__is_testnet = is_testnet
+        self.__ticker_callback = None
+        self.__ticker_socket = None
         self.__key = key
         self.__secret_key = secret_key
-        self.__ticker_socket = None
 
         self.__session = HTTP(
             testnet=is_testnet,
@@ -37,15 +53,15 @@ class BybitClient:
         )
 
         self.__socket = WebSocket(
-            testnet=self.__is_testnet,
+            testnet=is_testnet,
             channel_type="private",
             rsa_authentication=False,
-            api_key=self.__key,
-            api_secret=self.__secret_key,
+            api_key=key,
+            api_secret=secret_key,
             trace_logging=True,
             retries=30,
             ping_interval=30,   #20
-            ping_timeout=20,  #10
+            ping_timeout=20,    #10
             restart_on_error=True,
             private_auth_expire=1,
             callback_function=self.__websocket_handler
@@ -53,22 +69,34 @@ class BybitClient:
 
         self.__socket.order_stream(self.handler_ctx)
 
-    def __websocket_handler(self, message: dict):
-        print("--websocket_callback--")
-        print(message)
+    def get_open_orders(self, symbol: str) -> [Order]:
+        cursor = None
+        data = list()
 
-        try:
-            if message["op"] == "subscribe" and message["success"] is True:
-                self.subscribe()
-        except:
-            pass
+        def request():
+            return self.__session.get_open_orders(
+                category="spot",
+                symbol=symbol,
+                limit=50,
+                cursor=cursor
+            )
 
-        try:
-            response = WebsocketResponse.from_dict(message)
-            if self.order_callback:
-                self.order_callback(response.data)
-        except Exception as ex:
-            print(ex)
+        # TODO бесконечный цикл
+        while True:
+            result = BybitHandler.rest_handler(request())
+            book = Book.from_dict(result)
+
+            if not book.nextPageCursor:
+                break
+
+            data += book.list
+            cursor = book.nextPageCursor
+
+        result = list()
+        for item in data:
+            result.append(Order.from_dict(item))
+
+        return result
 
     def get_order_history(self, order_id: str):
         response = self.__session.get_order_history(
@@ -85,13 +113,10 @@ class BybitClient:
             symbol=symbol
         )
 
-        response = RestResponse.from_dict(response)
-        if response.retCode != 0:
-            raise Exception
-        else:
-            return InstrumentInfo.from_dict(response.result)
+        result = BybitHandler.rest_handler(response)
+        return InstrumentInfo.from_dict(result)
 
-    #TODO проверить
+    # TODO проверить
     def handler_ctx(self, message):
         print(message)
         pass
@@ -110,11 +135,9 @@ class BybitClient:
             orderId=order_id,
             price=price
         )
-        response = RestResponse.from_dict(response)
-        if response.retCode != 0:
-            raise Exception(f"Ошибка изменения ордера {response.retMsg}")
 
-        print(f"(amend order) {response.result}")
+        result = BybitHandler.rest_handler(response)
+        print(f"(amend order) {result}")
 
     def place_order(self, symbol: str, side: str, qty: int, price: Decimal) -> Order:
         response = self.__session.place_order(
@@ -126,24 +149,15 @@ class BybitClient:
             price=price,
             timeInForce="GTC"
         )
-        response = RestResponse.from_dict(response)
-        response.result["side"] = side
-        response.result["price"] = price
-        response.result["qty"] = qty
-        response.result["symbol"] = symbol
 
-        if response.retCode != 0:
-            raise Exception(f"ошибка создания ордера + {response.retMsg}")
+        result = BybitHandler.rest_handler(response)
+        result["side"] = side
+        result["price"] = price
+        result["qty"] = qty
+        result["symbol"] = symbol
 
         print(f"(place order) {response.result}")
-        return Order.from_dict(response.result)
-
-    def __ticker_handler(self, message: dict):
-        #TODO добавить обработку исключений. Написать класс для handler
-        try:
-            self.__ticker_callback(TickerResponse.from_dict(message))
-        except Exception as ex:
-            print(ex)
+        return Order.from_dict(result)
 
     def ticker_stream(self, symbol: str, callback: Callable[[TickerResponse], None]):
         if self.__ticker_socket:
@@ -158,4 +172,30 @@ class BybitClient:
             channel_type="spot"
         )
 
-        self.__ticker_socket.ticker_stream(symbol, self.__ticker_handler)
+        def ticker_handler(message):
+            if self.__ticker_callback is not None:
+                # TODO сделать валидацию входящего сообщения
+                try:
+                    self.__ticker_callback(TickerResponse.from_dict(message))
+                except Exception as ex:
+                    print(ex)
+
+        self.__ticker_socket.ticker_stream(symbol, ticker_handler)
+
+    def __websocket_handler(self, message: dict):
+        print("--websocket_callback--")
+        print(message)
+
+        # TODO сделать валидацию входящего сообщения, убрать магию.
+        try:
+            if message["op"] == "subscribe" and message["success"] is True:
+                self.subscribe()
+        except:
+            pass
+
+        try:
+            response = WebsocketResponse.from_dict(message)
+            if self.order_callback:
+                self.order_callback(response.data)
+        except Exception as ex:
+            print(ex)
