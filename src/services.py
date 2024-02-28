@@ -155,6 +155,7 @@ class BybitBotService:
     __open_orders: list[Order]
     __trigger_time: int
     __is_overlap_top: bool
+    __is_order_process: bool
 
     def __init__(
             self,
@@ -166,6 +167,7 @@ class BybitBotService:
             overlap_top_price: Decimal,
             symbol: str
     ):
+        self.__is_order_process = False
         self.__open_orders = list()
         self.__allow_range = allow_range
         self.__client = client
@@ -210,12 +212,20 @@ class BybitBotService:
 
     def __validate_open_orders(self):
         print("validate orders")
+        ht_order = None
         for order in self.__open_orders:
             try:
-                ctx_order = self.__client.get_order_history(order_id=order.orderId)
-                self.__order_handler([ctx_order])
+                h_order = self.__client.get_order_history(order_id=order.orderId)
+                if h_order.orderStatus == OrderStatus.Filled:
+                    ctx_order = next((item for item in self.__open_orders if item.orderId == h_order.orderId), None)
+                    if ctx_order is not None:
+                        self.__open_orders.remove(ctx_order)
+                        ht_order = ctx_order
             except Exception as ex:
                 print(ex)
+
+        if ht_order is not None:
+            self.__order_process(ht_order)
 
     def __offset_trade_range(self, direction: Side):
         print(f"TRIGGER t:{datetime.now()}")
@@ -254,20 +264,51 @@ class BybitBotService:
                 order.price = price
             except Exception as ex:
                 ctx_order = self.__client.get_order_history(order.orderId)
-                self.__order_handler([ctx_order])
+                # self.__order_handler([ctx_order])
                 print(ex)
-                # self.__open_orders.remove(order)
+                self.__open_orders.remove(order)
 
     def __order_handler(self, orders: list[Order]):
         for order in orders:
             if order.orderStatus == OrderStatus.Filled:
-                ctx_order = next((item for item in self.__open_orders if item.orderId == order.orderId), None)
+                self.__order_process(order)
 
+                ctx_order = next((item for item in self.__open_orders if item.orderId == order.orderId), None)
                 if ctx_order is None:
                     return
-
                 self.__open_orders.remove(ctx_order)
 
+                #
+                # # Выполнен ордер на закупку
+                # if order.side == Side.Buy:
+                #     # Меняем цену продажи на верхней границе торгового коридора
+                #     if self.__is_overlap_top:
+                #         ctx_price = self.__overlap_top_price
+                #     else:
+                #         ctx_price = self.__trade_range.top
+                #     ctx_side = Side.Sell.value
+                # # Выполнен ордер на продажу
+                # else:
+                #     ctx_price = self.__trade_range.bottom
+                #     ctx_side = Side.Buy.value
+                #
+                # open_order = self.__client.place_order(
+                #     symbol=self.__symbol_info.symbol,
+                #     side=ctx_side,
+                #     price=ctx_price,
+                #     qty=self.__qty
+                # )
+                #
+                # self.__open_orders.append(open_order)
+
+    def __order_process(self, order):
+        if self.__is_order_process:
+            return
+
+        self.__is_order_process = True
+
+        while True:
+            try:
                 # Выполнен ордер на закупку
                 if order.side == Side.Buy:
                     # Меняем цену продажи на верхней границе торгового коридора
@@ -287,8 +328,11 @@ class BybitBotService:
                     price=ctx_price,
                     qty=self.__qty
                 )
-
                 self.__open_orders.append(open_order)
+            except Exception as ex:
+                self.__is_order_process = False
+                print(f"ошибка. {ex}")
+                break
 
     def __ticker_handler(self, response: TickerResponse):
         lastPrice = response.data.lastPrice
