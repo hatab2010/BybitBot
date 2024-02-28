@@ -78,10 +78,10 @@ class TimeRangeTrigger:
 
     def set_range(self, target_range):
         accept_height = target_range.height
-        r_top_top = target_range.top + accept_height * 2
+        r_top_top = target_range.top + accept_height #* 2
         r_top_bottom = r_top_top - accept_height
         self.__top_range = Range(r_top_top, r_top_bottom)
-        r_bottom_top = target_range.bottom - accept_height
+        r_bottom_top = target_range.bottom #- accept_height
         r_bottom_bottom = r_bottom_top - accept_height
         self.__bottom_range = Range(r_bottom_top, r_bottom_bottom)
         self.__reset()
@@ -93,7 +93,7 @@ class TimeRangeTrigger:
             self.__values.append(price)
 
         if not is_trigger_start:
-            is_trigger_area = price >= self.__top_range.top or price <= self.__bottom_range.bottom
+            is_trigger_area = price > self.__top_range.top or price < self.__bottom_range.bottom
 
             if is_trigger_area:
                 self.__values = list()
@@ -152,7 +152,7 @@ class BybitBotService:
     __symbol_info: SymbolInfo
     __ticker_socket: WebSocket
     __client: BybitClient
-    __open_orders: list[Order] = list()
+    __open_orders: list[Order]
     __trigger_time: int
     __is_overlap_top: bool
 
@@ -163,8 +163,10 @@ class BybitBotService:
             qty: int,
             trigger: TimeRangeTrigger,
             allow_range: Range,
-            overlap_top_price: Decimal
+            overlap_top_price: Decimal,
+            symbol: str
     ):
+        self.__open_orders = list()
         self.__allow_range = allow_range
         self.__client = client
         self.__trade_range = trade_range
@@ -177,6 +179,7 @@ class BybitBotService:
         trigger.triggered = self.__offset_trade_range
         client.order_callback = self.__order_handler
         client.subscribe = self.__validate_open_orders
+        self.set_symbol(symbol)
 
     def set_symbol(self, symbol: str):
         tick_size = self.__client.get_instrument_info(symbol).list[0].priceFilter.tick_size
@@ -185,16 +188,25 @@ class BybitBotService:
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
         self.__client.ticker_stream(symbol, self.__ticker_handler)
 
-    def start(self, order_pool_count: int):
-        for index in range(order_pool_count):
-            open_order = self.__client.place_order(
-                symbol=self.__symbol_info.symbol,
-                side=str(Side.Buy.value),
-                price=self.__trade_range.bottom,
-                qty=self.__qty
-            )
+    def set_orders_count(self, count: int, side: Side):
+        self.__open_orders += self.__client.get_open_orders(self.__symbol_info.symbol)
+        need_to_create = count - len(self.__open_orders)
 
-            self.__open_orders.append(open_order)
+        if side == Side.Buy:
+            p = self.__trade_range.bottom
+        else:
+            p = self.__trade_range.top
+
+        if need_to_create > 0:
+            for index in range(need_to_create):
+                open_order = self.__client.place_order(
+                    symbol=self.__symbol_info.symbol,
+                    side=str(side.value),
+                    price=p,
+                    qty=self.__qty
+                )
+
+                self.__open_orders.append(open_order)
 
     def __validate_open_orders(self):
         print("validate orders")
@@ -241,6 +253,8 @@ class BybitBotService:
                 )
                 order.price = price
             except Exception as ex:
+                ctx_order = self.__client.get_order_history(order.orderId)
+                self.__order_handler([ctx_order])
                 print(ex)
                 # self.__open_orders.remove(order)
 

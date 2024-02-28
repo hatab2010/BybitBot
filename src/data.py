@@ -18,6 +18,7 @@ class Setting:
     orderCount: int
     symbol: str
     triggerDuration: int
+    side: int
 
     @staticmethod
     def from_dict(obj: Any) -> 'Setting':
@@ -33,6 +34,8 @@ class Setting:
         _triggerDuration = int(obj.get("triggerDuration"))
         _orderCount = int(obj.get("orderCount"))
         _symbol = str(obj.get("symbol"))
+        _side = int(obj.get("side"))
+
         return Setting(
             _isTestnet,
             _key,
@@ -45,7 +48,8 @@ class Setting:
             _tradeAmount,
             _orderCount,
             _symbol,
-            _triggerDuration
+            _triggerDuration,
+            _side
         )
 
 
@@ -74,7 +78,8 @@ class Order:
         _orderIv = str(obj.get("orderIv"))
         _timeInForce = str(obj.get("timeInForce"))
         _orderStatus = str(obj.get("orderStatus"))
-        return Order(_symbol, _orderId, _side, _orderType, _cancelType, _price, _qty, _orderIv, _timeInForce, _orderStatus)
+        return Order(_symbol, _orderId, _side, _orderType, _cancelType, _price, _qty, _orderIv, _timeInForce,
+                     _orderStatus)
 
 
 @dataclass
@@ -172,7 +177,8 @@ class ListDatum:
         _lotSizeFilter = LotSizeFilter.from_dict(obj.get("lotSizeFilter"))
         _priceFilter = PriceFilter.from_dict(obj.get("priceFilter"))
         _riskParameters = RiskParameters.from_dict(obj.get("riskParameters"))
-        return ListDatum(_symbol, _baseCoin, _quoteCoin, _innovation, _status, _marginTrading, _lotSizeFilter, _priceFilter, _riskParameters)
+        return ListDatum(_symbol, _baseCoin, _quoteCoin, _innovation, _status, _marginTrading, _lotSizeFilter,
+                         _priceFilter, _riskParameters)
 
 
 @dataclass
@@ -210,7 +216,8 @@ class TickerData:
         _turnover24h = str(obj.get("turnover24h"))
         _price24hPcnt = str(obj.get("price24hPcnt"))
         _usdIndexPrice = str(obj.get("usdIndexPrice"))
-        return TickerData(_symbol, _lastPrice, _highPrice24h, _lowPrice24h, _prevPrice24h, _volume24h, _turnover24h, _price24hPcnt, _usdIndexPrice)
+        return TickerData(_symbol, _lastPrice, _highPrice24h, _lowPrice24h, _prevPrice24h, _volume24h, _turnover24h,
+                          _price24hPcnt, _usdIndexPrice)
 
 
 @dataclass
@@ -229,3 +236,17 @@ class TickerResponse:
         _cs = float(obj.get("cs"))
         _data = TickerData.from_dict(obj.get("data"))
         return TickerResponse(_topic, _ts, _type, _cs, _data)
+
+
+@dataclass
+class Book:
+    nextPageCursor: str
+    category: str
+    list: List[object]
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'Book':
+        _nextPageCursor = str(obj.get("nextPageCursor"))
+        _category = str(obj.get("category"))
+        _list = obj.get("list")
+        return Book(_nextPageCursor, _category, _list)
