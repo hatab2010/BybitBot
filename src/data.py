@@ -18,6 +18,7 @@ class Setting:
     orderCount: int
     symbol: str
     triggerDuration: int
+    side: int
 
     @staticmethod
     def from_dict(obj: Any) -> 'Setting':
@@ -33,6 +34,8 @@ class Setting:
         _triggerDuration = int(obj.get("triggerDuration"))
         _orderCount = int(obj.get("orderCount"))
         _symbol = str(obj.get("symbol"))
+        _side = int(obj.get("side"))
+
         return Setting(
             _isTestnet,
             _key,
@@ -45,7 +48,8 @@ class Setting:
             _tradeAmount,
             _orderCount,
             _symbol,
-            _triggerDuration
+            _triggerDuration,
+            _side
         )
 
 

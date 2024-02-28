@@ -2,12 +2,16 @@ import json
 from time import sleep
 from data import Setting
 from models import BybitClient
-from services import BybitBotService, Range, TimeRangeTrigger
+from services import BybitBotService, Range, TimeRangeTrigger, Side
 
 # Получаем настройки бота
 with open("settings.json", "r") as file:
     settingText = file.read()
 settings = Setting.from_dict(json.loads(settingText))
+if settings.side == 0:
+    side = Side.Buy
+else:
+    side = Side.Sell
 
 client = BybitClient(
         is_testnet=settings.isTestnet,
@@ -40,6 +44,6 @@ trade_bot = BybitBotService(
 )
 
 sleep(3)
-trade_bot.set_orders_count(settings.orderCount)
+trade_bot.set_orders_count(settings.orderCount, side)
 while True:
     sleep(1)

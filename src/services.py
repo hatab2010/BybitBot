@@ -78,10 +78,10 @@ class TimeRangeTrigger:
 
     def set_range(self, target_range):
         accept_height = target_range.height
-        r_top_top = target_range.top + accept_height * 2
+        r_top_top = target_range.top + accept_height #* 2
         r_top_bottom = r_top_top - accept_height
         self.__top_range = Range(r_top_top, r_top_bottom)
-        r_bottom_top = target_range.bottom - accept_height
+        r_bottom_top = target_range.bottom #- accept_height
         r_bottom_bottom = r_bottom_top - accept_height
         self.__bottom_range = Range(r_bottom_top, r_bottom_bottom)
         self.__reset()
@@ -93,7 +93,7 @@ class TimeRangeTrigger:
             self.__values.append(price)
 
         if not is_trigger_start:
-            is_trigger_area = price >= self.__top_range.top or price <= self.__bottom_range.bottom
+            is_trigger_area = price > self.__top_range.top or price < self.__bottom_range.bottom
 
             if is_trigger_area:
                 self.__values = list()
@@ -188,16 +188,21 @@ class BybitBotService:
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
         self.__client.ticker_stream(symbol, self.__ticker_handler)
 
-    def set_orders_count(self, count: int):
+    def set_orders_count(self, count: int, side: Side):
         self.__open_orders += self.__client.get_open_orders(self.__symbol_info.symbol)
         need_to_create = count - len(self.__open_orders)
+
+        if side == Side.Buy:
+            p = self.__trade_range.bottom
+        else:
+            p = self.__trade_range.top
 
         if need_to_create > 0:
             for index in range(need_to_create):
                 open_order = self.__client.place_order(
                     symbol=self.__symbol_info.symbol,
-                    side=str(Side.Buy.value),
-                    price=self.__trade_range.bottom,
+                    side=str(side.value),
+                    price=p,
                     qty=self.__qty
                 )
 
@@ -248,6 +253,8 @@ class BybitBotService:
                 )
                 order.price = price
             except Exception as ex:
+                ctx_order = self.__client.get_order_history(order.orderId)
+                self.__order_handler([ctx_order])
                 print(ex)
                 # self.__open_orders.remove(order)
 
