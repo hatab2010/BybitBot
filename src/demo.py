@@ -1,20 +1,16 @@
-import json
-from time import sleep
-from data import Setting
-from models import BybitClient
-from pybit.unified_trading import WebSocket, HTTP
+i = None
 
-# Получаем настройки бота
-with open("settings.json", "r") as file:
-    settingText = file.read()
-settings = Setting.from_dict(json.loads(settingText))
+for item in range(10):
+    i = 1
 
-client = BybitClient(
-        is_testnet=settings.isTestnet,
-        key=settings.key,
-        secret_key=settings.secretKey
-)
+print(i)
 
-client.get_open_orders(
-    symbol="USDCUSDT"
-)
+while True:
+    try:
+        if i > 3:
+            raise Exception("ex")
+
+        i += 1
+    except Exception as ex:
+        print("ex")
+        break

@@ -61,18 +61,19 @@ class TimeRangeTrigger:
     __bottom_range: Range
     __timer: Optional[Timer]
     __values: list[Decimal]
-    __accept_duration: int
+    __trigger_duration_buy: int
     __side: Side
 
     def __init__(
             self,
             target_range: Range,
-            accept_height: Decimal,  # TODO дополнрительный параметр
-            trigger_duration: int
+            trigger_duration_buy: int,
+            trigger_duration_sell: int
     ):
         self.__timer = None
         self.__values = list()
-        self.__accept_duration = trigger_duration
+        self.__trigger_duration_buy = trigger_duration_buy
+        self.__trigger_duration_sell = trigger_duration_sell
         self.set_range(target_range)
         self.__side = Side.Buy
 
@@ -84,6 +85,9 @@ class TimeRangeTrigger:
         r_bottom_top = target_range.bottom #- accept_height
         r_bottom_bottom = r_bottom_top - accept_height
         self.__bottom_range = Range(r_bottom_top, r_bottom_bottom)
+        print(f"{datetime.now()} SET TRIGGER AREA\n"
+              f"BUY in:{r_top_top} out:{r_top_bottom}\n"
+              f"SELL in:{r_bottom_bottom} out:{r_bottom_top}")
         self.__reset()
 
     def push(self, price: Decimal):
@@ -93,36 +97,41 @@ class TimeRangeTrigger:
             self.__values.append(price)
 
         if not is_trigger_start:
-            is_trigger_area = price > self.__top_range.top or price < self.__bottom_range.bottom
+            is_trigger_area = price >= self.__top_range.top or price <= self.__bottom_range.bottom
 
             if is_trigger_area:
                 self.__values = list()
 
                 if price >= self.__top_range.bottom:
                     self.__side = Side.Buy
+                    trigger_duration = self.__trigger_duration_buy
                 else:
                     self.__side = Side.Sell
+                    trigger_duration = self.__trigger_duration_sell
 
                 self.__values.append(price)
-                self.__timer = Timer(self.__accept_duration, self.__trigger)
+                self.__timer = Timer(trigger_duration, self.__trigger)
                 self.__timer.start()
-                print("TRIGGER START")
+                print(f"{datetime.now()} TRIGGER START\n"
+                      f"side:{self.__side.value} price:{price}")
 
         is_outside_top_trigger_area = self.__side == Side.Buy and price < self.__top_range.bottom
         is_outside_bottom_trigger_area = self.__side == Side.Sell and price > self.__bottom_range.top
         if is_trigger_start and (is_outside_top_trigger_area or is_outside_bottom_trigger_area):
+            print(f"{datetime.now()} TRIGGER STOP\n"
+                  f"side:{self.__side.value} price:{price}")
             self.__reset()
-            print("TRIGGER STOP")
 
     def __trigger(self):
         average_price = sum(self.__values) / len(self.__values)
+        print("TRIGGER\n"
+              f"average_price:{average_price}")
 
         if self.__side == Side.Buy:
             offset_top = self.__top_range.top - average_price
             offset_bottom = average_price - self.__top_range.bottom
 
             if offset_top < offset_bottom or average_price >= self.__top_range.top:
-
                 if self.triggered:
                     self.triggered(self.__side)
                     self.__reset()
@@ -131,13 +140,16 @@ class TimeRangeTrigger:
         else:
             offset_top = self.__bottom_range.top - average_price
             offset_bottom = average_price - self.__bottom_range.bottom
-            if offset_bottom < offset_top or average_price < self.__bottom_range.bottom:
 
+            if offset_bottom < offset_top or average_price < self.__bottom_range.bottom:
                 if self.triggered:
                     self.triggered(self.__side)
                     self.__reset()
+            else:
+                self.__reset()
 
     def __reset(self):
+        print("TRIGGER RESET")
         if self.__timer:
             self.__timer.cancel()
         self.__timer = None
@@ -152,7 +164,6 @@ class BybitBotService:
     __symbol_info: SymbolInfo
     __ticker_socket: WebSocket
     __client: BybitClient
-    __open_orders: list[Order]
     __trigger_time: int
     __is_overlap_top: bool
     __is_order_process: bool
@@ -168,7 +179,6 @@ class BybitBotService:
             symbol: str
     ):
         self.__is_order_process = False
-        self.__open_orders = list()
         self.__allow_range = allow_range
         self.__client = client
         self.__trade_range = trade_range
@@ -185,55 +195,39 @@ class BybitBotService:
 
     def set_symbol(self, symbol: str):
         tick_size = self.__client.get_instrument_info(symbol).list[0].priceFilter.tick_size
-
-        self.__open_orders = list()
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
         self.__client.ticker_stream(symbol, self.__ticker_handler)
 
     def set_orders_count(self, count: int, side: Side):
-        self.__open_orders += self.__client.get_open_orders(self.__symbol_info.symbol)
-        need_to_create = count - len(self.__open_orders)
-
-        if side == Side.Buy:
-            p = self.__trade_range.bottom
-        else:
-            p = self.__trade_range.top
+        open_orders = self.__client.get_open_orders(self.__symbol_info.symbol)
+        need_to_create = count - len(open_orders)
+        price = self.__trade_range.bottom if side == Side.Buy else self.__trade_range.top
 
         if need_to_create > 0:
             for index in range(need_to_create):
-                open_order = self.__client.place_order(
+                self.__client.place_order(
                     symbol=self.__symbol_info.symbol,
                     side=str(side.value),
-                    price=p,
+                    price=price,
                     qty=self.__qty
                 )
 
-                self.__open_orders.append(open_order)
-
     def __validate_open_orders(self):
-        print("validate orders")
-        ht_order = None
-        for order in self.__open_orders:
-            try:
-                h_order = self.__client.get_order_history(order_id=order.orderId)
-                if h_order.orderStatus == OrderStatus.Filled:
-                    ctx_order = next((item for item in self.__open_orders if item.orderId == h_order.orderId), None)
-                    if ctx_order is not None:
-                        self.__open_orders.remove(ctx_order)
-                        ht_order = ctx_order
-            except Exception as ex:
-                print(ex)
+        print("VALIDATE ORDERS")
 
-        if ht_order is not None:
-            self.__order_process(ht_order)
+        # if ht_order is not None:
+        self.__order_process(Side.Buy)
+        self.__order_process(Side.Sell)
 
     def __offset_trade_range(self, direction: Side):
-        print(f"TRIGGER t:{datetime.now()}")
-        is_outside_bottom = self.__allow_range.bottom > self.__trade_range.bottom
+        print(f"{datetime.now()} TRIGGER")
+        is_outside_bottom = self.__trade_range.bottom < self.__allow_range.bottom
         is_outside_top = self.__trade_range.top > self.__allow_range.top
 
         if is_outside_bottom or is_outside_top:
-            print("Outside in allow price range")
+            print(f"OUTSIDE IN ALLOW PRICE RANGE\n"
+                  f"allow_range[{self.__allow_range.bottom},{self.__allow_range.top}]\n "
+                  f"trade_range[{self.__trade_range.bottom},[{self.__trade_range.bottom}]]")
             return
 
         if direction == Side.Buy:
@@ -241,76 +235,42 @@ class BybitBotService:
         else:
             self.__trade_range.offset(-1)
 
+        print(f"new trade_range [{self.__trade_range.bottom},{self.__trade_range.top}]")
+
         self.__is_overlap_top = self.__allow_range.top == self.__trade_range.top
 
         self.__update_orders(direction)
         self.__trigger.set_range(self.__trade_range)
 
     def __update_orders(self, side: Side):
-        refresh_orders = [order for order in self.__open_orders if order.side == side]
+        print(f"UPDATE ORDERS")
+        open_orders = self.__client.get_open_orders(self.__symbol_info.symbol)
+        update_orders = [order for order in open_orders if order.side == side]
+        price = self.__trade_range.bottom if side == Side.Buy else self.__trade_range.top
 
-        if side == Side.Buy:
-            price = self.__trade_range.bottom
-        else:
-            price = self.__trade_range.top
-
-        for order in refresh_orders:
-            try:
-                self.__client.amend_order(
-                    order.symbol,
-                    order.orderId,
-                    price
-                )
-                order.price = price
-            except Exception as ex:
-                ctx_order = self.__client.get_order_history(order.orderId)
-                # self.__order_handler([ctx_order])
-                print(ex)
-                self.__open_orders.remove(order)
+        for order in update_orders:
+            self.__client.amend_order(
+                order.symbol,
+                order.orderId,
+                price
+            )
 
     def __order_handler(self, orders: list[Order]):
         for order in orders:
             if order.orderStatus == OrderStatus.Filled:
-                self.__order_process(order)
+                self.__order_process(order.side)
 
-                ctx_order = next((item for item in self.__open_orders if item.orderId == order.orderId), None)
-                if ctx_order is None:
-                    return
-                self.__open_orders.remove(ctx_order)
-
-                #
-                # # Выполнен ордер на закупку
-                # if order.side == Side.Buy:
-                #     # Меняем цену продажи на верхней границе торгового коридора
-                #     if self.__is_overlap_top:
-                #         ctx_price = self.__overlap_top_price
-                #     else:
-                #         ctx_price = self.__trade_range.top
-                #     ctx_side = Side.Sell.value
-                # # Выполнен ордер на продажу
-                # else:
-                #     ctx_price = self.__trade_range.bottom
-                #     ctx_side = Side.Buy.value
-                #
-                # open_order = self.__client.place_order(
-                #     symbol=self.__symbol_info.symbol,
-                #     side=ctx_side,
-                #     price=ctx_price,
-                #     qty=self.__qty
-                # )
-                #
-                # self.__open_orders.append(open_order)
-
-    def __order_process(self, order):
+    def __order_process(self, side: Union[str, Side]):
         if self.__is_order_process:
             return
 
         self.__is_order_process = True
+        last_open_order = None
 
         while True:
             try:
                 # Выполнен ордер на закупку
-                if order.side == Side.Buy:
+                if side == Side.Buy:
                     # Меняем цену продажи на верхней границе торгового коридора
                     if self.__is_overlap_top:
                         ctx_price = self.__overlap_top_price
@@ -328,8 +288,10 @@ class BybitBotService:
                     price=ctx_price,
                     qty=self.__qty
                 )
-                self.__open_orders.append(open_order)
+                last_open_order = open_order
             except Exception as ex:
+                if last_open_order is not None and side == Side.Buy:
+                    self.__client.remove_order(self.__symbol_info.symbol, last_open_order.orderId)
                 self.__is_order_process = False
                 print(f"ошибка. {ex}")
                 break

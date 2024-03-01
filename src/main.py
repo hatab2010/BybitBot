@@ -24,8 +24,8 @@ trade_range = Range(
 )
 trade_trigger = TimeRangeTrigger(
     target_range=trade_range,
-    trigger_duration=settings.triggerDuration,
-    accept_height=trade_range.height
+    trigger_duration_buy=settings.triggerDurationBuy,
+    trigger_duration_sell=settings.triggerDurationSell
 )
 trade_bot = BybitBotService(
     qty=settings.tradeAmount,
