@@ -221,8 +221,8 @@ class BybitBotService:
 
     def __offset_trade_range(self, direction: Side):
         print(f"{datetime.now()} TRIGGER")
-        is_outside_bottom = self.__trade_range.bottom < self.__allow_range.bottom
-        is_outside_top = self.__trade_range.top > self.__allow_range.top
+        is_outside_bottom = self.__trade_range.bottom <= self.__allow_range.bottom and direction == Side.Sell
+        is_outside_top = self.__trade_range.top >= self.__allow_range.top and direction == Side.Buy
 
         if is_outside_bottom or is_outside_top:
             print(f"OUTSIDE IN ALLOW PRICE RANGE\n"
@@ -249,11 +249,14 @@ class BybitBotService:
         price = self.__trade_range.bottom if side == Side.Buy else self.__trade_range.top
 
         for order in update_orders:
-            self.__client.amend_order(
-                order.symbol,
-                order.orderId,
-                price
-            )
+            try:
+                self.__client.amend_order(
+                    order.symbol,
+                    order.orderId,
+                    price
+                )
+            except Exception as ex:
+                print(ex)
 
     def __order_handler(self, orders: list[Order]):
         for order in orders:
@@ -290,7 +293,7 @@ class BybitBotService:
                 )
                 last_open_order = open_order
             except Exception as ex:
-                if last_open_order is not None and side == Side.Buy:
+                if last_open_order is not None and side == Side.Sell:
                     self.__client.remove_order(self.__symbol_info.symbol, last_open_order.orderId)
                 self.__is_order_process = False
                 print(f"ошибка. {ex}")
