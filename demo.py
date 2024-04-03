@@ -1,8 +1,2 @@
-from threading import Timer
+from typing import Optional, Callable
 
-def callback():
-    print("TRIGGER")
-
-
-timer = Timer(3, callback)
-timer.start()

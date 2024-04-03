@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import List
 
-
+#TODO переехать на Pydantic
 @dataclass
 class Setting:
     isTestnet: bool
@@ -253,3 +253,9 @@ class Book:
         _category = str(obj.get("category"))
         _list = obj.get("list")
         return Book(_nextPageCursor, _category, _list)
+
+
+@dataclass
+class Bayer:
+    price: Decimal
+    quantity: Decimal

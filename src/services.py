@@ -6,8 +6,8 @@ from typing import Callable, Optional, Union
 
 from pybit.unified_trading import WebSocket
 
-from data import Order, TickerResponse
-from models import BybitClient
+from data import Bayer, Order, TickerResponse
+from src.api.bybit_client import BybitClient
 from threading import Timer
 
 
@@ -46,12 +46,26 @@ class Range:
         self.__top = self.__top + length
         self.__bottom = self.__bottom + length
 
-
 @dataclass
 class SymbolInfo:
     symbol: str
     tick_size: Decimal
     last_price: Optional[Decimal]
+
+
+class BuyerOrderbookTrigger:
+    triggered: Optional[Callable[[Side], None]]
+    is_complete: bool
+
+    __trade_range: Range
+    __min_bid_size: Decimal
+
+    def __init__(self, trade_range: Range, min_bid_size: Decimal):
+        self.__trade_range = trade_range
+        self.__min_bid_size = min_bid_size
+
+    def set_range(self, trade_range: Range):
+        pass
 
 
 class TimeRangeTrigger:
@@ -70,6 +84,7 @@ class TimeRangeTrigger:
             trigger_duration_buy: int,
             trigger_duration_sell: int
     ):
+        self.triggered = None
         self.__timer = None
         self.__values = list()
         self.__trigger_duration_buy = trigger_duration_buy

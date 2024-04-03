@@ -1,7 +1,7 @@
 import json
 from time import sleep
 from data import Setting
-from models import BybitClient
+from src.api.bybit_client import BybitClient
 from services import BybitBotService, Range, TimeRangeTrigger, Side
 
 # Получаем настройки бота
@@ -18,32 +18,35 @@ client = BybitClient(
         key=settings.key,
         secret_key=settings.secretKey
 )
-trade_range = Range(
-    top=settings.sellPrice,
-    bottom=settings.buyPrice
-)
-trade_trigger = TimeRangeTrigger(
-    target_range=trade_range,
-    trigger_duration_buy=settings.triggerDurationBuy,
-    trigger_duration_sell=settings.triggerDurationSell
-)
-trade_bot = BybitBotService(
-    qty=settings.tradeAmount,
-    trade_range=Range(
-        top=settings.sellPrice,
-        bottom=settings.buyPrice
-    ),
-    trigger=trade_trigger,
-    client=client,
-    allow_range=Range(
-        top=settings.allowTopPrice,
-        bottom=settings.allowBottomPrice
-    ),
-    overlap_top_price=settings.overlapSellPrice,
-    symbol=settings.symbol
-)
 
-sleep(3)
-trade_bot.set_orders_count(settings.orderCount, side)
-while True:
-    sleep(1)
+print(client.get_order_history(symbol="USDCUSDT"))
+
+# trade_range = Range(
+#     top=settings.sellPrice,
+#     bottom=settings.buyPrice
+# )
+# trade_trigger = TimeRangeTrigger(
+#     target_range=trade_range,
+#     trigger_duration_buy=settings.triggerDurationBuy,
+#     trigger_duration_sell=settings.triggerDurationSell
+# )
+# trade_bot = BybitBotService(
+#     qty=settings.tradeAmount,
+#     trade_range=Range(
+#         top=settings.sellPrice,
+#         bottom=settings.buyPrice
+#     ),
+#     trigger=trade_trigger,
+#     client=client,
+#     allow_range=Range(
+#         top=settings.allowTopPrice,
+#         bottom=settings.allowBottomPrice
+#     ),
+#     overlap_top_price=settings.overlapSellPrice,
+#     symbol=settings.symbol
+# )
+#
+# sleep(3)
+# trade_bot.set_orders_count(settings.orderCount, side)
+# while True:
+#     sleep(1)
