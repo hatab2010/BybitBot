@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class Snapshot(BaseModel):
+class EventMessage(BaseModel):
     topic: str
     timestamp: int = Field(..., alias='ts')
     message_type: str = Field(..., alias='type')
@@ -12,14 +12,14 @@ class Snapshot(BaseModel):
     data: Any
 
 
-class RestMessage:
+class APIResponse:
     ret_code: int = Field(..., alias='retCode')
     ret_msg: str = Field(..., alias='retMsg')
     result: Any = Field(alias='result')
 
 
-class SocketEvent(BaseModel):
+class SocketOperation(BaseModel):
     success: bool
     ret_msg: str
-    operation: str
-    connection_id: str
+    op: str
+    conn_id: str

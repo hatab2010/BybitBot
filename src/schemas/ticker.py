@@ -3,7 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 
-class TickerSnapshot(BaseModel):
+class Ticker(BaseModel):
     symbol: str
     last_price: Decimal = Field(..., alias='lastPrice')
     high_price_24h: Decimal = Field(..., alias='highPrice24h')

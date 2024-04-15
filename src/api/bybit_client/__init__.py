@@ -5,7 +5,9 @@ from typing import Any, Callable, Optional
 from pybit.unified_trading import HTTP, WebSocket
 
 from .websockets import BybitWebsocketClient
-from data import Book, InstrumentInfo, Order, RestResponse, TickerResponse, WebsocketResponse
+from data import InstrumentInfo, RestResponse, TickerResponse, WebsocketResponse
+from schemas import Book, Order
+from schemas.order import Order, OrderEntity
 
 
 class BybitHandler:
@@ -22,17 +24,11 @@ class BybitHandler:
 
 # TODO разделить на WebsocketClient и RESTClient
 class BybitClient:
-    order_callback: Callable[[list[Order]], None]
-    subscribe: Callable
-
-    __category: str = "spot"
-
     __websocket_callback: Callable[[str], None]
     __ticker_callback: Optional[Callable[[TickerResponse], None]]
     __key: str
     __secret_key: str
     __session: HTTP
-    __socket: WebSocket
     __ticker_socket: Optional[WebSocket]
     __is_testnet: bool
 
@@ -42,7 +38,7 @@ class BybitClient:
             secret_key: str,
             is_testnet: bool
     ):
-        self.__websocket_client = BybitWebsocketClient(is_testnet)
+        self.websocket = BybitWebsocketClient(key, secret_key)
         self.__is_testnet = is_testnet
         self.__ticker_callback = None
         self.__ticker_socket = None
@@ -55,171 +51,102 @@ class BybitClient:
             api_secret=secret_key
         )
 
-        self.__orderbook_socket = WebSocket(
-            testnet=is_testnet,
-            channel_type="spot"
-        )
+    def place_order(self, **kwargs) -> Order:
+        needed_keys = ["side", "price", "qty", "symbol"]
+        if not all(key in kwargs for key in needed_keys):
+            raise ValueError("Не все обязательные ключи предоставлены")
 
-        self.__socket = WebSocket(
-            testnet=is_testnet,
-            channel_type="private",
-            rsa_authentication=False,
-            api_key=key,
-            api_secret=secret_key,
-            trace_logging=True,
-            retries=30,
-            ping_interval=30,
-            ping_timeout=20,
-            restart_on_error=True,
-            private_auth_expire=1,
-            callback_function=self.__order_handler
-        )
+        response = self.__session.place_order(**kwargs)
+        result = BybitHandler.rest_handler(response)
+        result.update({key: kwargs[key] for key in needed_keys})
 
-    def get_open_orders(self, symbol: str) -> [Order]:
+        print(f"(place order) {result}")
+        return Order(**result)
+
+    def get_open_orders(self, symbol: str, category: str) -> [Order]:
         cursor = None
-        data = list()
+        result = []
 
-        def request():
-            return self.__session.get_open_orders(
-                category="spot",
+        while True:
+            response = self.__session.get_open_orders(
+                category=category,
                 symbol=symbol,
                 limit=50,
                 cursor=cursor
             )
 
-        # TODO бесконечный цикл
-        while True:
-            result = BybitHandler.rest_handler(request())
-            book = Book.from_dict(result)
+            book = BybitHandler.rest_handler(response)
+            order_book = Book(**book)
 
-            if not book.nextPageCursor:
+            result.extend(Order.parse_obj(item) for item in order_book.list)
+
+            if not order_book.next_page_cursor:
                 break
 
-            data += book.list
-            cursor = book.nextPageCursor
-
-        result = list()
-        for item in data:
-            result.append(Order.from_dict(item))
+            cursor = order_book.next_page_cursor
 
         return result
 
     def get_order_history(self, symbol: str):
         cursor = None
-        data = list()
+        result = []
 
-        def request():
-            return self.__session.get_order_history(
+        while True:
+            result = BybitHandler.rest_handler(self.__session.get_order_history(
                 category="spot",
                 symbol=symbol,
                 limit=50,
                 cursor=cursor
-            )
+            ))
+            book = Book.parse_obj(result)
 
-        # TODO бесконечный цикл
-        while True:
-            result = BybitHandler.rest_handler(request())
-            book = Book.from_dict(result)
+            result += book.list
 
-            if not book.nextPageCursor:
+            if not book.next_page_cursor:
                 break
 
-            data += book.list
-            cursor = book.nextPageCursor
+            cursor = book.next_page_cursor
 
-        # result = list()
-        # for item in data:
-        #     result.append(Order.from_dict(item))
+        return result
 
-        return data
-
-    def get_instrument_info(self, symbol) -> InstrumentInfo:
+    def get_instrument_info(self, symbol: str, category: str) -> InstrumentInfo:
         response = self.__session.get_instruments_info(
-            category="spot",
+            category=category,
             symbol=symbol
         )
 
         result = BybitHandler.rest_handler(response)
         return InstrumentInfo.from_dict(result)
 
-    def remove_order(self, symbol: str, order_id: str):
-        self.__session.cancel_order(
-            category="spot",
-            symbol=symbol,
-            orderId=order_id
-        )
+    def cancel_order(self, **kwargs) -> OrderEntity:
+        response = self.__session.cancel_order(**kwargs)
+        result = BybitHandler.rest_handler(response)
+        return OrderEntity(**result)
 
-    def amend_order(self, symbol: str, order_id: str, price: Decimal):
-        response = self.__session.amend_order(
-            category="spot",
-            symbol=symbol,
-            orderId=order_id,
-            price=price
-        )
-
+    def amend_order(self, **kwargs):
+        response = self.__session.amend_order(**kwargs)
         result = BybitHandler.rest_handler(response)
         print(f"(amend order) {result}")
 
-    def place_order(self, symbol: str, side: str, qty: int, price: Decimal) -> Order:
-        response = self.__session.place_order(
-            category="spot",
-            symbol=symbol,
-            side=side,
-            orderType="Limit",
-            qty=qty,
-            price=price,
-            timeInForce="GTC"
-        )
-
+    def cancel_all_orders(self, category: str) -> [OrderEntity]:
+        response = self.__session.cancel_all_orders(category=category)
         result = BybitHandler.rest_handler(response)
-        result["side"] = side
-        result["price"] = price
-        result["qty"] = qty
-        result["symbol"] = symbol
+        return [OrderEntity(**item) for item in result]
 
-        print(f"(place order) {result}")
-        return Order.from_dict(result)
-
-    def ticker_stream(self, symbol: str, callback: Callable[[TickerResponse], None]):
-        if self.__ticker_socket:
-            self.__ticker_socket.exit()
-
-        self.__ticker_callback = callback
-
-        self.__ticker_socket = WebSocket(
-            testnet=self.__is_testnet,
-            api_key=self.__key,
-            api_secret=self.__secret_key,
-            channel_type="spot"
-        )
-
-        def ticker_handler(message):
-            if self.__ticker_callback is not None:
-                # TODO сделать валидацию входящего сообщения
-                try:
-                    self.__ticker_callback(TickerResponse.from_dict(message))
-                except Exception as ex:
-                    print(ex)
-
-        self.__ticker_socket.ticker_stream(symbol, ticker_handler)
-
-    def cancel_all_orders(self):
-        self.__session.cancel_all_orders(category="spot")
-
-    def __order_handler(self, message: dict):
-        print("--websocket_callback--")
-        print(message)
-
-        # TODO сделать валидацию входящего сообщения, убрать магию.
-        try:
-            if message["op"] == "subscribe" and message["success"] is True:
-                self.subscribe()
-        except:
-            pass
-
-        try:
-            response = WebsocketResponse.from_dict(message)
-            if self.order_callback:
-                self.order_callback(response.data)
-        except Exception as ex:
-            print(ex)
+    # def __order_stream_handler(self, message: dict):
+    #     print(message)
+    #     is_auth_message = message.get("op") == "auth" or message.get("type") == "AUTH_RESP"
+    #     is_subscription_message = message.get("op") == "subscribe" or message.get("type") == "COMMAND_RESP"
+    #     is_normal_message = not is_auth_message and not is_subscription_message
+    #
+    #     if is_auth_message:
+    #         return
+    #     elif is_subscription_message and message["success"] is True:
+    #         self.on_success_subscribe()
+    #     elif is_normal_message:
+    #         try:
+    #             response = WebsocketResponse.from_dict(message)
+    #             if self.order_callback:
+    #                 self.order_callback(response.data)
+    #         except Exception as ex:
+    #             print(ex)

@@ -1,8 +1,9 @@
 import json
 from time import sleep
-from data import Setting
+from schemas.setting import Setting
 from src.api.bybit_client import BybitClient
-from services import BybitBotService, Range, TimeRangeTrigger, Side
+from services.bot import TimeRangeTrigger, Side, TradeRange
+from src.services.bot import BybitBotService
 
 # Получаем настройки бота
 with open("settings.json", "r") as file:
@@ -14,9 +15,9 @@ else:
     side = Side.Sell
 
 client = BybitClient(
-        is_testnet=settings.isTestnet,
+        is_testnet=settings.is_testnet,
         key=settings.key,
-        secret_key=settings.secretKey
+        secret_key=settings.secret_key
 )
 
 print(client.get_order_history(symbol="USDCUSDT"))

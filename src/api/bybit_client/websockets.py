@@ -1,56 +1,67 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Callable, Optional
 
 from pybit.unified_trading import WebSocket
-from pydantic import BaseModel, ValidationError
-from pydantic.v1 import validator
+from pydantic import ValidationError
 
-from schemas import OrderbookSnapshot, TickerSnapshot, Snapshot
-from schemas.webcallbacks import SocketEvent
+from schemas import Orderbook, Ticker, EventMessage
+from schemas.order import Order
+from schemas.webcallbacks import SocketOperation
 
 
-# --websocket_callback--
-# {'success': True, 'ret_msg': '', 'op': 'auth', 'conn_id': 'cmjop6gf2tdtup418330-iodm0'}
-# float() argument must be a string or a real number, not 'NoneType'
-# --websocket_callback--
-# {'req_id': '7fe03a9c-793b-498c-9523-dd12c3fe3c1e', 'success': True, 'ret_msg': '', 'op': 'subscribe', 'conn_id': 'cmjop6gf2tdtup418330-iodm0'}
-class BaseWebsocket(ABC):
-    callback_function: Optional[Callable]
+# --websocket_callback-- {'success': True, 'ret_msg': '', 'op': 'auth', 'conn_id': 'cmjop6gf2tdtup418330-iodm0'}
+# float() argument must be a string or a real number, not 'NoneType' --websocket_callback-- {'req_id':
+# '7fe03a9c-793b-498c-9523-dd12c3fe3c1e', 'success': True, 'ret_msg': '', 'op': 'subscribe', 'conn_id':
+# 'cmjop6gf2tdtup418330-iodm0'}
+
+
+class WebsocketBase(ABC):
+    __socket: WebSocket
     __is_testnet: bool
 
     def __init__(self, is_testnet: bool):
-
         self.__is_testnet = is_testnet
 
     def stream(
             self,
-            callback: Union[OrderbookSnapshot, TickerSnapshot],
             symbol: str,
-            channel_type: str = "spot",
-            socket_event: Optional[Callable[[SocketEvent], None]] = None
-    ):
-        self.__socket_event = socket_event
-        wrapped_callback = lambda data: self.__validate_and_forward(data, callback)
-        socket = WebSocket(testnet=self.__is_testnet, channel_type=channel_type)
-        socket.callback = wrapped_callback  # Подписка на сообщения сокета (auth)
-        self._stream_impl(socket, symbol, wrapped_callback)
-        return socket
+            channel_type: str,
+            callback: Callable,
+            operation_callback: Optional[Callable[[SocketOperation], None]] = None
+    ) -> WebSocket:
+        def wrapped_callback(data):
+            self.__validate_and_forward(data, callback, operation_callback)
 
-    def __validate_and_forward(self, data, callback):
-        if 'ret_msg' in data:
-            if self.__socket_event:
-                try:
-                    self.__socket_event(SocketEvent.parse_obj(data))
-                except ValidationError as e:
-                    print("Ошибка валидации:", e.json())
-            return
+        self.__socket = self._create_socket(channel_type, self.__is_testnet)
+        self.__socket.callback = wrapped_callback  # Подписка на сообщения сокета (auth, subscribe)
+        self._stream_impl(self.__socket, symbol, wrapped_callback)
+        return self.__socket
 
-        try:
-            message = Snapshot.parse_obj(data)
-            data = self._parse_obj(message.data)
-            callback(data)
-        except ValidationError as e:
-            print("Ошибка валидации:", e.json())
+    def __validate_and_forward(self, data, callback, operation_callback):
+        is_operation_message = 'ret_msg' in data
+        is_normal_message = 'topic' in data
+
+        if is_operation_message and operation_callback:
+            try:
+                operation = SocketOperation(**data)
+            except ValidationError as e:
+                print("Ошибка валидации:", e.json())
+                return
+
+            operation_callback(operation)
+
+        if is_normal_message:
+            try:
+                snapshot = EventMessage(**data)
+                data_parsed = self._parse_obj(snapshot.data)
+            except ValidationError as e:
+                print("Ошибка валидации:", e.json())
+                return
+
+            callback(data_parsed)
+
+    def _create_socket(self, channel_type, is_testnet) -> WebSocket:
+        return WebSocket(testnet=is_testnet, channel_type=channel_type)
 
     @abstractmethod
     def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
@@ -61,37 +72,67 @@ class BaseWebsocket(ABC):
         pass
 
 
-class OrderbookWebsocket(BaseWebsocket):
+class PrivateWebsocket(WebsocketBase):
+    __key: str
+    __secret: str
+
+    def __init__(self, key: str, secret: str, is_testnet: bool = False):
+        super().__init__(is_testnet)
+
+        self.__key = key
+        self.__secret = secret
+
+    def _create_socket(self, channel_type, is_testnet) -> WebSocket:
+        return WebSocket(
+            testnet=is_testnet,
+            api_key=self.__key,
+            api_secret=self.__secret,
+            channel_type=channel_type
+        )
+
+    @abstractmethod
+    def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
+        pass
+
+    @abstractmethod
+    def _parse_obj(self, data):
+        pass
+
+
+class OrderbookWebsocket(WebsocketBase):
     def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
         socket.orderbook_stream(50, symbol, callback)
 
     def _parse_obj(self, data):
-        return OrderbookSnapshot.parse_obj(data)
+        return Orderbook.parse_obj(**data)
 
 
-class TickerWebsocket(BaseWebsocket):
+class TickerWebsocket(WebsocketBase):
     def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
         socket.ticker_stream(symbol, callback)
 
     def _parse_obj(self, data):
-        return TickerSnapshot.parse_obj(data)
+        return Ticker(**data)
 
 
-class OrderWebsocket(BaseWebsocket):
+class OrderWebsocket(PrivateWebsocket):
+
     def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
-        raise NotImplemented
+        socket.order_stream(callback)
 
     def _parse_obj(self, data):
-        raise NotImplemented
+        return Order(**data)
 
 
 class BybitWebsocketClient:
     orderbook: OrderbookWebsocket
     ticker: TickerWebsocket
+    order: OrderWebsocket
 
-    def __init__(self, is_testnet: bool):
+    def __init__(self, key: str, secret: str, is_testnet: bool = False):
         self.orderbook = OrderbookWebsocket(is_testnet)
         self.ticker = TickerWebsocket(is_testnet)
+        self.order = OrderWebsocket(key, secret)
 
 
 __all__ = ["BybitWebsocketClient"]

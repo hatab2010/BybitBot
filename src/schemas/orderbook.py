@@ -1,12 +1,12 @@
 from decimal import Decimal
+from typing import List
 
 from pydantic import BaseModel, Field
-from typing import List
 
 
 class PriceVolume(BaseModel):
     price: Decimal
-    volume: Decimal
+    size: Decimal
 
     @classmethod
     def __get_validators__(cls):
@@ -20,7 +20,7 @@ class PriceVolume(BaseModel):
         return cls(price=price, volume=volume)
 
 
-class OrderBook(BaseModel):
+class Orderbook(BaseModel):
     symbol: str = Field(..., alias='s')
     bids: List[PriceVolume] = Field(..., alias='b')
     asks: List[PriceVolume] = Field(..., alias='a')
