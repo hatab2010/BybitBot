@@ -1,0 +1,67 @@
+2024-04-17 19:40:30,593 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9998, 0.9999] size[2269809.5, 1353678.03]
+2024-04-17 19:41:29,928 - core.log - INFO - Side.Buy
+2024-04-17 19:45:44,968 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9998, 0.9999] size[3834889.3, 75275.06]
+2024-04-17 19:45:45,349 - core.log - INFO - Side.Sell
+2024-04-17 19:47:21,064 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9998, 0.9999] size[3806291.46, 142758.22]
+2024-04-17 19:47:21,075 - core.log - INFO - Side.Buy
+2024-04-17 19:52:58,584 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3239619.1, 694663.97]
+2024-04-17 19:53:10,956 - core.log - INFO - Side.Sell
+2024-04-17 19:59:35,642 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3059121.08, 452690.76]
+2024-04-17 19:59:36,939 - core.log - INFO - Side.Buy
+2024-04-17 19:59:43,249 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3080159.27, 431652.57]
+2024-04-17 19:59:43,259 - core.log - INFO - Side.Sell
+2024-04-17 20:01:47,750 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3863917.72, 181706.99]
+2024-04-17 20:01:48,175 - core.log - INFO - Side.Sell
+2024-04-17 20:02:04,403 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3922740.12, 122950.53]
+2024-04-17 20:02:04,436 - core.log - INFO - Side.Sell
+2024-04-17 20:04:34,048 - core.log - CRITICAL - create_task() missing 1 required positional argument: 'coro'
+Traceback (most recent call last):
+  File "C:\Projects\BybitBot\src\api\bybit_client\websockets.py", line 55, in __validate_and_forward
+    callback(data_parsed)
+  File "C:\Projects\BybitBot\src\services\bot\socket_bridges.py", line 61, in __handler
+    asyncio.create_task()
+TypeError: create_task() missing 1 required positional argument: 'coro'
+2024-04-17 20:04:34,483 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3634917.14, 1236783.63]
+2024-04-17 20:05:34,935 - core.log - CRITICAL - no running event loop
+Traceback (most recent call last):
+  File "C:\Projects\BybitBot\src\api\bybit_client\websockets.py", line 55, in __validate_and_forward
+    callback(data_parsed)
+  File "C:\Projects\BybitBot\src\services\bot\socket_bridges.py", line 62, in __handler
+    asyncio.create_task(self.message_event._fire(message))
+  File "C:\Users\Hatab\AppData\Local\Programs\Python\Python310\lib\asyncio\tasks.py", line 336, in create_task
+    loop = events.get_running_loop()
+RuntimeError: no running event loop
+2024-04-17 20:05:34,996 - core.log - INFO - Установлен orderbook триггер на TradeRange[0.9999, 1] size[3580628.94, 1047282.61]
+2024-04-17 20:08:37,150 - core.log - CRITICAL - no running event loop
+Traceback (most recent call last):
+  File "C:\Projects\BybitBot\src\api\bybit_client\websockets.py", line 55, in __validate_and_forward
+    callback(data_parsed)
+  File "C:\Projects\BybitBot\src\services\bot\socket_bridges.py", line 62, in __handler
+    asyncio.create_task(self.message_event._fire(message))
+  File "C:\Users\Hatab\AppData\Local\Programs\Python\Python310\lib\asyncio\tasks.py", line 336, in create_task
+    loop = events.get_running_loop()
+RuntimeError: no running event loop
+2024-04-17 20:21:34,602 - core.log - INFO - Установлен orderbook триггер на TradeRange[1, 1.0001] size[3051937.59, 470844.94]
+2024-04-17 20:22:16,281 - core.log - INFO - Установлен orderbook триггер на TradeRange[1, 1.0001] size[3634283.92, 490246.58]
+2024-04-17 20:22:17,063 - core.log - INFO - Side.Sell
+2024-04-17 20:22:22,072 - core.log - INFO - Side.Buy
+2024-04-17 20:22:27,081 - core.log - INFO - Side.Buy
+2024-04-17 20:22:35,236 - core.log - INFO - Установлен orderbook триггер на TradeRange[1, 1.0001] size[3648648.75, 477103.68]
+2024-04-17 20:22:35,691 - core.log - INFO - Side.Buy
+2024-04-17 20:22:36,695 - core.log - INFO - Side.Buy
+2024-04-17 20:22:37,698 - core.log - INFO - Side.Buy
+2024-04-17 20:22:38,699 - core.log - INFO - Side.Sell
+2024-04-17 20:22:39,702 - core.log - INFO - Side.Buy
+2024-04-17 20:22:40,718 - core.log - INFO - Side.Buy
+2024-04-17 20:22:41,735 - core.log - INFO - Side.Buy
+2024-04-17 20:22:42,737 - core.log - INFO - Side.Sell
+2024-04-17 20:22:43,745 - core.log - INFO - Side.Buy
+2024-04-17 20:22:44,750 - core.log - INFO - Side.Buy
+2024-04-17 20:22:45,753 - core.log - INFO - Side.Buy
+2024-04-17 20:22:46,763 - core.log - INFO - Side.Buy
+2024-04-17 20:22:47,775 - core.log - INFO - Side.Buy
+2024-04-17 20:22:48,783 - core.log - INFO - Side.Buy
+2024-04-17 20:22:49,797 - core.log - INFO - Side.Buy
+2024-04-17 20:22:50,812 - core.log - INFO - Side.Buy
+2024-04-17 20:22:51,818 - core.log - INFO - Side.Buy
+2024-04-17 20:22:52,822 - core.log - INFO - Side.Sell

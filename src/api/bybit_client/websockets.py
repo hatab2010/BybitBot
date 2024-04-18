@@ -1,18 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
+from core.log import logger
 from pybit.unified_trading import WebSocket
 from pydantic import ValidationError
 
 from schemas import Orderbook, Ticker, EventMessage
 from schemas.order import Order
 from schemas.webcallbacks import SocketOperation
-
-
-# --websocket_callback-- {'success': True, 'ret_msg': '', 'op': 'auth', 'conn_id': 'cmjop6gf2tdtup418330-iodm0'}
-# float() argument must be a string or a real number, not 'NoneType' --websocket_callback-- {'req_id':
-# '7fe03a9c-793b-498c-9523-dd12c3fe3c1e', 'success': True, 'ret_msg': '', 'op': 'subscribe', 'conn_id':
-# 'cmjop6gf2tdtup418330-iodm0'}
 
 
 class WebsocketBase(ABC):
@@ -33,7 +28,8 @@ class WebsocketBase(ABC):
             self.__validate_and_forward(data, callback, operation_callback)
 
         self.__socket = self._create_socket(channel_type, self.__is_testnet)
-        self.__socket.callback = wrapped_callback  # Подписка на сообщения сокета (auth, subscribe)
+        if operation_callback:
+            self.__socket.callback = wrapped_callback  # Подписка на сообщения сокета (auth, subscribe)
         self._stream_impl(self.__socket, symbol, wrapped_callback)
         return self.__socket
 
@@ -44,21 +40,25 @@ class WebsocketBase(ABC):
         if is_operation_message and operation_callback:
             try:
                 operation = SocketOperation(**data)
-            except ValidationError as e:
-                print("Ошибка валидации:", e.json())
+                operation_callback(operation)
+            except ValidationError as ex:
+                logger.error(f"Ошибка валидации: {ex.errors()}")
                 return
-
-            operation_callback(operation)
+            except Exception as ex:
+                logger.critical(ex, exc_info=True)
+                raise ex
 
         if is_normal_message:
             try:
                 snapshot = EventMessage(**data)
                 data_parsed = self._parse_obj(snapshot.data)
-            except ValidationError as e:
-                print("Ошибка валидации:", e.json())
+                callback(data_parsed)
+            except ValidationError as ex:
+                logger.error(f"Ошибка валидации. {ex.errors()}")
                 return
-
-            callback(data_parsed)
+            except Exception as ex:
+                logger.critical(ex, exc_info=True)
+                raise ex
 
     def _create_socket(self, channel_type, is_testnet) -> WebSocket:
         return WebSocket(testnet=is_testnet, channel_type=channel_type)
@@ -101,10 +101,10 @@ class PrivateWebsocket(WebsocketBase):
 
 class OrderbookWebsocket(WebsocketBase):
     def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
-        socket.orderbook_stream(50, symbol, callback)
+        socket.orderbook_stream(1, symbol, callback)
 
     def _parse_obj(self, data):
-        return Orderbook.parse_obj(**data)
+        return Orderbook(**data)
 
 
 class TickerWebsocket(WebsocketBase):
@@ -116,7 +116,6 @@ class TickerWebsocket(WebsocketBase):
 
 
 class OrderWebsocket(PrivateWebsocket):
-
     def _stream_impl(self, socket: WebSocket, symbol: str, callback: Callable):
         socket.order_stream(callback)
 

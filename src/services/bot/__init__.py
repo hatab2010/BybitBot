@@ -9,8 +9,9 @@ from api import BybitClient
 from schemas.order import Order
 from domain_models import Side, TradeRange
 from services.bot.order_manager import OrderManager
-from socket_bridges import TickerBridge, OrderbookBridge
+from .socket_bridges import TickerBridge, OrderbookBridge
 from services.bot.triggers import TimeRangeTrigger
+from core.log import logger
 
 
 @dataclass
@@ -28,6 +29,7 @@ class BotOptions:
     overlap_top_price: Decimal
     symbol: str
     category: str
+
 
 @dataclass
 class SocketBridgesHub:
@@ -48,6 +50,7 @@ class BybitBotService:
 
     def __init__(
             self,
+            symbol: str,
             options: BotOptions,
             client: BybitClient,
             trigger: TimeRangeTrigger
@@ -59,20 +62,18 @@ class BybitBotService:
         self.__trigger = trigger
         self.__is_overlap_sell_price = self.__options.allow_range.sell == self.__options.trade_range.sell
 
-        trigger.triggered = self.__offset_trade_range
-        # client.order_callback = self.__order_handler
-        # client.on_success_subscribe = self.__two_side_create_orders
+        trigger.on_triggered = self.__offset_trade_range
         self.set_symbol(options.symbol)
 
     def set_symbol(self, symbol: str):
         tick_size = self.__client.get_instrument_info(symbol, "spot").list[0].priceFilter.tick_size
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
-        del self.__order_manager
+        self.__order_manager.exit()
         self.__order_manager = OrderManager(self.__client, symbol, self.__options.category)
         self.__client.websocket.ticker.stream(symbol, "spot", self.__ticker_handler)
 
     def set_orders_count(self, count: int, side: Side):
-        need_to_create = count - len(self.__order_manager.open_orders)
+        need_to_create = count - len(self.__order_manager.__open_orders)
         price = self.__options.trade_range.buy if side == Side.Buy else self.__options.trade_range.sell
 
         if need_to_create > 0:
@@ -112,7 +113,7 @@ class BybitBotService:
         self.__is_overlap_sell_price = self.__options.allow_range.sell == self.__options.trade_range.sell
 
         self.__amend_all_orders(direction)
-        self.__trigger.set_range(self.__options.trade_range)
+        self.__trigger.set_range_and_restart(self.__options.trade_range)
 
     def __amend_all_orders(self, side: Side):
         print(f"Amend all orders in side {side.value}")
@@ -121,11 +122,6 @@ class BybitBotService:
 
     def on_order_filled(self, order: Order):
         self.__create_orders_while_possible(order.side)
-
-    # def __order_handler(self, orders: list[Order]):
-    #     for order in orders:
-    #         if order.status == OrderStatus.Filled:
-    #             pass
 
     def __create_orders_while_possible(self, side: Union[str, Side]):
         if self.__is_order_process:
@@ -171,6 +167,6 @@ class BybitBotService:
                 print(f"ошибка. {ex}")
                 break
 
-    def __ticker_handler(self, response: TickerResponse):
-        self.__trigger.__push(Decimal(response.data.lastPrice))
-        self.__symbol_info.last_price = response.data.lastPrice
+    # def __ticker_handler(self, response: TickerResponse):
+    #     self.__trigger.__push(Decimal(response.data.lastPrice))
+    #     self.__symbol_info.last_price = response.data.lastPrice

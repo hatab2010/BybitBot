@@ -1,53 +1,64 @@
+import asyncio
 import json
-from time import sleep
+import logging
+import time
+from decimal import Decimal
+
+from core.log import logger
 from schemas.setting import Setting
-from src.api.bybit_client import BybitClient
-from services.bot import TimeRangeTrigger, Side, TradeRange
-from src.services.bot import BybitBotService
+from services.bot.triggers import OrderbookTrigger
+from api.bybit_client import BybitClient
+from services.bot import Side, TradeRange, OrderbookBridge
 
 # Получаем настройки бота
 with open("settings.json", "r") as file:
     settingText = file.read()
-settings = Setting.from_dict(json.loads(settingText))
+settings = Setting(**json.loads(settingText))
 if settings.side == 0:
     side = Side.Buy
 else:
     side = Side.Sell
 
 client = BybitClient(
-        is_testnet=settings.is_testnet,
-        key=settings.key,
-        secret_key=settings.secret_key
+    key=settings.key,
+    secret_key=settings.secret_key
 )
 
-print(client.get_order_history(symbol="USDCUSDT"))
+orderbook_bridge = OrderbookBridge(
+    symbol=settings.symbol,
+    client=client,
+    category="spot"
+)
+trigger = None
 
-# trade_range = Range(
-#     top=settings.sellPrice,
-#     bottom=settings.buyPrice
-# )
-# trade_trigger = TimeRangeTrigger(
-#     target_range=trade_range,
-#     trigger_duration_buy=settings.triggerDurationBuy,
-#     trigger_duration_sell=settings.triggerDurationSell
-# )
-# trade_bot = BybitBotService(
-#     qty=settings.tradeAmount,
-#     trade_range=Range(
-#         top=settings.sellPrice,
-#         bottom=settings.buyPrice
-#     ),
-#     trigger=trade_trigger,
-#     client=client,
-#     allow_range=Range(
-#         top=settings.allowTopPrice,
-#         bottom=settings.allowBottomPrice
-#     ),
-#     overlap_top_price=settings.overlapSellPrice,
-#     symbol=settings.symbol
-# )
-#
-# sleep(3)
-# trade_bot.set_orders_count(settings.orderCount, side)
-# while True:
-#     sleep(1)
+def on_channel_change_signal(side: Side):
+    logger.info(side)
+    time.sleep(1)
+    trigger.restart()
+
+
+def get_marker_trade_range():
+    data = client.get_orderbook(symbol=settings.symbol, category="spot")
+
+    trade_range = {
+        'trade_range': TradeRange(sell=data.asks[0].price, buy=data.bids[0].price),
+        'ask_size': data.asks[0].size - 1000,
+        'bid_size': data.bids[0].size - 1000
+    }
+
+    return trade_range
+
+
+trade_range = get_marker_trade_range()
+
+trigger = OrderbookTrigger(
+    orderbook_bridge=orderbook_bridge,
+    trade_range=trade_range["trade_range"],
+    min_ask_size=trade_range["ask_size"],
+    min_bid_size=trade_range["bid_size"],
+    on_triggered=on_channel_change_signal
+)
+
+
+while True:
+    time.sleep(1)

@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 
 from pybit.unified_trading import WebSocket
-
 from api import BybitClient
 from core.event import Event
 from schemas import Ticker, Orderbook
+from core.log import logger
 
 
 class SocketBridgeBase(ABC):
@@ -19,14 +19,14 @@ class SocketBridgeBase(ABC):
         self._symbol = symbol
         self._category = category
         self._client = client
-        self.impl()
+        self._impl()
 
     def exit(self):
         self._socket.exit()
         self.message_event.clear_subscribers()
 
     @abstractmethod
-    def impl(self):
+    def _impl(self):
         pass
 
 
@@ -40,7 +40,7 @@ class TickerBridge(SocketBridgeBase):
     def __handler(self, message: Ticker):
         self.message_event._fire(message)
 
-    def impl(self):
+    def _impl(self):
         self._socket = self._client.websocket.ticker.stream(self._symbol, self._category, self.__handler)
         self.message_event = TickerEvent()
 
@@ -53,8 +53,13 @@ class OrderbookBridge(SocketBridgeBase):
     message_event: OrderbookEvent
 
     def __handler(self, message: Orderbook):
+        # nearest_bid = message.bids[0]
+        # nearest_ask = message.asks[0]
+
+        logger.debug(f"OrderbookBridge {message}")
+
         self.message_event._fire(message)
 
-    def impl(self):
+    def _impl(self):
         self._socket = self._client.websocket.orderbook.stream(self._symbol, self._category, self.__handler)
         self.message_event = OrderbookEvent()

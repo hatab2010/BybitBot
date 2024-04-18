@@ -1,10 +1,17 @@
-from decimal import Decimal
-from typing import Union
-
+from abc import ABC
 from domain_models import TradeRange
 
 
-class WithoutTradeRangeException(Exception):
+class DomainException(ABC, Exception):
+    pass
+
+
+class TriggerException(ABC, DomainException):
+    pass
+
+
+class WithoutTradeRangeException(TriggerException):
     def __init__(self, trade_range: TradeRange, current_range: TradeRange):
-        super().__init__(f"trade_range: {vars(trade_range)}\n"
-                         f"market_range: {vars(current_range)}")
+        super().__init__(f"Ошибка. Неверно указан торговый канал. "
+                         f"trade_range: {trade_range.buy}-{trade_range.sell} "
+                         f"market_range: {current_range.buy}-{current_range.sell}")

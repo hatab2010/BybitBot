@@ -1,28 +1,29 @@
 from decimal import Decimal
 from typing import List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PriceVolume(BaseModel):
     price: Decimal
     size: Decimal
 
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    @model_validator(mode="before")
+    def validate(cls, data):
+        if not "price" in data and not "size" in data and len(data) == 2:
+            data = {'price': Decimal(data[0]), "size": Decimal(data[1])}
+        return data
 
-    @classmethod
-    def validate(cls, v):
-        if not isinstance(v, list) or len(v) != 2:
-            raise ValueError("price volume pair must be a list of two elements")
-        price, volume = v
-        return cls(price=price, volume=volume)
+    def __str__(self):
+        return f"[{self.price}, {self.size}]"
+
+    def __repr__(self):
+        return f"[{self.price}, {self.size}]"
 
 
 class Orderbook(BaseModel):
-    symbol: str = Field(..., alias='s')
-    bids: List[PriceVolume] = Field(..., alias='b')
-    asks: List[PriceVolume] = Field(..., alias='a')
-    update_id: int = Field(..., alias='u')
-    sequence: int = Field(..., alias='seq')
+    symbol: str = Field(alias='s')
+    bids: List[PriceVolume] = Field(alias='b')
+    asks: List[PriceVolume] = Field(alias='a')
+    update_id: int = Field(alias='u')
+    sequence: int = Field(alias='seq')

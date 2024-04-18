@@ -38,3 +38,6 @@ class TradeRange:
         length = self.height * step_offset
         self.__sell = self.__sell + length
         self.__buy = self.__buy + length
+
+    def __str__(self):
+        return f"[{self.__buy}, {self.__sell}]"

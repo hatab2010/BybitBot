@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional, Dict
 
 from pydantic import BaseModel, Field
 
@@ -7,14 +7,14 @@ class EventMessage(BaseModel):
     topic: str
     timestamp: int = Field(..., alias='ts')
     message_type: str = Field(..., alias='type')
-    checksum: int = Field(alias='cs')
-    creation_timestamp: int = Field(alias='cts')
-    data: Any
+    checksum: Optional[int] = Field(alias='cs', default=None)
+    creation_timestamp: Optional[int] = Field(alias='cts', default=None)
+    data: Dict
 
 
-class APIResponse:
-    ret_code: int = Field(..., alias='retCode')
-    ret_msg: str = Field(..., alias='retMsg')
+class APIResponse(BaseModel):
+    ret_code: int = Field(alias='retCode')
+    ret_msg: str = Field(alias='retMsg')
     result: Any = Field(alias='result')
 
 

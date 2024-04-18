@@ -6,9 +6,10 @@ from typing import Optional, Callable
 
 from exceptions import WithoutTradeRangeException
 from schemas import Ticker
-from schemas.orderbook import PriceVolume, Orderbook
+from schemas.orderbook import Orderbook
 from services.bot import Side, TradeRange
-from services.bot.socket_bridges import TickerEvent, TickerBridge, OrderbookBridge
+from services.bot.socket_bridges import TickerBridge, OrderbookBridge
+from core.log import logger
 
 
 class TradeTriggerBase(ABC):
@@ -18,7 +19,7 @@ class TradeTriggerBase(ABC):
         self.on_triggered = None
 
     @abstractmethod
-    def set_range(self, target_range: TradeRange):
+    def set_range_and_restart(self, target_range: TradeRange):
         pass
 
 
@@ -38,16 +39,16 @@ class TimeRangeTrigger(TradeTriggerBase):
             ticker_bridge: TickerBridge
     ):
         super().__init__()
-        self.triggered = None
+        self.on_triggered = None
         self.__timer = None
         self.__values = list()
         self.__trigger_duration_buy = trigger_duration_buy
         self.__trigger_duration_sell = trigger_duration_sell
         self.__side = Side.Buy
-        self.set_range(target_range)
+        self.set_range_and_restart(target_range)
         ticker_bridge.message_event.subscribe(self.__push)
 
-    def set_range(self, target_range: TradeRange):
+    def set_range_and_restart(self, target_range: TradeRange):
         accept_height = target_range.height
         r_top_top = target_range.sell + accept_height
         r_top_bottom = r_top_top - accept_height
@@ -101,8 +102,8 @@ class TimeRangeTrigger(TradeTriggerBase):
             offset_bottom = average_price - self.__top_range.buy
 
             if offset_top < offset_bottom or average_price >= self.__top_range.sell:
-                if self.triggered:
-                    self.triggered(self.__side)
+                if self.on_triggered:
+                    self.on_triggered(self.__side)
                     self.reset()
             else:
                 self.reset()
@@ -111,8 +112,8 @@ class TimeRangeTrigger(TradeTriggerBase):
             offset_bottom = average_price - self.__bottom_range.buy
 
             if offset_bottom < offset_top or average_price < self.__bottom_range.buy:
-                if self.triggered:
-                    self.triggered(self.__side)
+                if self.on_triggered:
+                    self.on_triggered(self.__side)
                     self.reset()
             else:
                 self.reset()
@@ -126,7 +127,7 @@ class TimeRangeTrigger(TradeTriggerBase):
 
 
 class OrderbookTrigger(TradeTriggerBase):
-    __is_finalized: bool
+    __is_triggered: bool
     __trade_range: TradeRange
     __min_bid_size: Decimal
     __min_ask_size: Decimal
@@ -136,35 +137,52 @@ class OrderbookTrigger(TradeTriggerBase):
             orderbook_bridge: OrderbookBridge,
             trade_range: TradeRange,
             min_bid_size: Decimal,
-            min_ask_size: Decimal
+            min_ask_size: Decimal,
+            on_triggered: Callable[[Side], None] = None
     ):
-        self.__is_finalized = False
-        self.__trade_range = trade_range
+        super().__init__()
+        self.on_triggered = on_triggered
+        self.__is_triggered = False
         self.__min_bid_size = min_bid_size
         self.__min_ask_size = min_ask_size
+        self.set_range_and_restart(trade_range)
+        self.__trade_range = trade_range
 
-        orderbook_bridge.message_event.subscribe(self.orderbook_handler)
+        orderbook_bridge.message_event.subscribe(self.__orderbook_handler)
 
-    def set_range(self, trade_range: TradeRange):
-        raise NotImplemented()
+    def set_range_and_restart(self, trade_range: TradeRange):
+        logger.info(
+            f"Установлен orderbook триггер на TradeRange{str(trade_range)} size[{self.__min_bid_size}, {self.__min_ask_size}]")
+        self.__trade_range = trade_range
+        self.restart()
 
-    def orderbook_handler(self, orderbook: Orderbook):
-        if self.__is_finalized:
+    def restart(self):
+        self.__is_triggered = False
+
+    def __orderbook_handler(self, orderbook: Orderbook):
+        if self.__is_triggered:
             return
 
-        self.__validate_trade_range(orderbook)
+        is_valid = self.__validate_trade_range(orderbook)
 
-        nearest_bid = orderbook.bids[0]
-        nearest_ask = orderbook.asks[0]
-
-        if nearest_bid.size <= self.__min_bid_size:
-
-    def reset(self):
-        self.__is_finalized = False
-
-    def __validate_trade_range(self, orderbook: Orderbook):
-        if orderbook.asks[0].price != self.__trade_range.buy:
+        if not is_valid:
+            self.__is_triggered = True
             raise WithoutTradeRangeException(
                 self.__trade_range,
                 TradeRange(orderbook.bids[0].price, orderbook.asks[0].price)
             )
+
+        nearest_bid = orderbook.bids[0]
+        nearest_ask = orderbook.asks[0]
+
+        self.__check_and_trigger(nearest_bid.size, self.__min_bid_size, Side.Buy)
+        self.__check_and_trigger(nearest_ask.size, self.__min_ask_size, Side.Sell)
+
+    def __check_and_trigger(self, size, min_size, side):
+        if size <= min_size:
+            self.__is_triggered = True
+            if self.on_triggered:
+                self.on_triggered(side)
+
+    def __validate_trade_range(self, orderbook: Orderbook) -> bool:
+        return orderbook.asks[0].price == self.__trade_range.sell

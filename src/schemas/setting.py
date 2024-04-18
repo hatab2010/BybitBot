@@ -6,8 +6,6 @@ class Setting(BaseModel):
     is_testnet: bool = Field(..., alias="isTestnet")
     key: str = Field(...)
     secret_key: str = Field(..., alias="secretKey")
-    buy_price: Decimal = Field(..., alias="buyPrice")
-    sell_price: Decimal = Field(..., alias="sellPrice")
     allow_top_price: Decimal = Field(..., alias="allowTopPrice")
     allow_bottom_price: Decimal = Field(..., alias="allowBottomPrice")
     overlap_sell_price: Decimal = Field(..., alias="overlapSellPrice")
