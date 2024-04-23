@@ -56,9 +56,9 @@ class TimeRangeTrigger(TradeTriggerBase):
         r_bottom_top = target_range.buy
         r_bottom_bottom = r_bottom_top - accept_height
         self.__bottom_range = TradeRange(r_bottom_top, r_bottom_bottom)
-        print(f"{datetime.now()} SET TRIGGER AREA\n"
-              f"BUY in:{r_top_top} out:{r_top_bottom}\n"
-              f"SELL in:{r_bottom_bottom} out:{r_bottom_top}")
+        logger.info(f"{datetime.now()} SET TRIGGER AREA\n"
+                    f"BUY in:{r_top_top} out:{r_top_bottom}\n"
+                    f"SELL in:{r_bottom_bottom} out:{r_bottom_top}")
         self.reset()
 
     def __push(self, ticker: Ticker) -> None:
@@ -73,29 +73,29 @@ class TimeRangeTrigger(TradeTriggerBase):
                 self.__values = list()
 
                 if ticker.last_price >= self.__top_range.buy:
-                    self.__side = Side.Buy
+                    self.__side = Side.Sell
                     trigger_duration = self.__trigger_duration_buy
                 else:
-                    self.__side = Side.Sell
+                    self.__side = Side.Buy
                     trigger_duration = self.__trigger_duration_sell
 
                 self.__values.append(ticker.last_price)
                 self.__timer = Timer(trigger_duration, self.__trigger)
                 self.__timer.start()
-                print(f"{datetime.now()} TRIGGER START\n"
-                      f"side:{self.__side.value} price:{ticker.last_price}")
+                logger.info(f"{datetime.now()} TRIGGER START\n"
+                            f"side:{self.__side.value} price:{ticker.last_price}")
 
         is_outside_top_trigger_area = self.__side == Side.Buy and ticker.last_price < self.__top_range.buy
         is_outside_bottom_trigger_area = self.__side == Side.Sell and ticker.last_price > self.__bottom_range.sell
         if is_trigger_start and (is_outside_top_trigger_area or is_outside_bottom_trigger_area):
-            print(f"{datetime.now()} TRIGGER STOP\n"
-                  f"side:{self.__side.value} price:{ticker.last_price}")
+            logger.info(f"{datetime.now()} TRIGGER STOP\n"
+                        f"side:{self.__side.value} price:{ticker.last_price}")
             self.reset()
 
     def __trigger(self):
         average_price = sum(self.__values) / len(self.__values)
-        print("TRIGGER\n"
-              f"average_price:{average_price}")
+        logger.info("TRIGGER\n"
+                    f"average_price:{average_price}")
 
         if self.__side == Side.Buy:
             offset_top = self.__top_range.sell - average_price
@@ -119,7 +119,7 @@ class TimeRangeTrigger(TradeTriggerBase):
                 self.reset()
 
     def reset(self):
-        print(f"{self.__class__.__name__} RESET")
+        logger.info(f"{self.__class__.__name__} RESET")
         if self.__timer:
             self.__timer.cancel()
         self.__timer = None
@@ -163,14 +163,8 @@ class OrderbookTrigger(TradeTriggerBase):
         if self.__is_triggered:
             return
 
-        is_valid = self.__validate_trade_range(orderbook)
-
-        if not is_valid:
-            self.__is_triggered = True
-            raise WithoutTradeRangeException(
-                self.__trade_range,
-                TradeRange(orderbook.bids[0].price, orderbook.asks[0].price)
-            )
+        if not self.__validate_trade_range(orderbook):
+            return
 
         nearest_bid = orderbook.bids[0]
         nearest_ask = orderbook.asks[0]

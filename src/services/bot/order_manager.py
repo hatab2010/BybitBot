@@ -65,7 +65,7 @@ class OrderManager:
             self.__open_orders.remove(exist_orders[-1])
 
     def amend_all_orders(self, side: Side, price: Decimal):
-        # Из-за возможных разрывов соединения WebSocket необходимо актуализировать информацию92731
+        # Из-за возможных разрывов соединения WebSocket необходимо актуализировать информацию
         self.__reload_open_orders()
         amend_orders = [order for order in self.__open_orders if order.side == side]
 

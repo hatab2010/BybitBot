@@ -41,7 +41,6 @@ class TriggerMix(TradeTriggerBase):
         self.__buy_trigger = buy_trigger
         self.__sell_trigger = sell_trigger
 
-
     def on_sell_triggered(self):
         pass
 

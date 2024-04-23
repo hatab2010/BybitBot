@@ -1,9 +1,7 @@
 import logging
 import os
-import time
-import traceback
-from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
+
 
 class CustomFormatter(logging.Formatter):
     white = "\x1b[37m"
@@ -38,6 +36,7 @@ def trace(self, message, *args, **kws):
         # Мы вызываем метод _log напрямую, чтобы передать свой уровень
         self._log(TRACE_LEVEL_NUM, message, args, **kws)
 
+
 # Добавляем уровень и функцию к логгеру
 logging.addLevelName(TRACE_LEVEL_NUM, 'TRACE')
 logging.Logger.trace = trace
@@ -65,6 +64,5 @@ consoleHandler.setLevel(logging.DEBUG)
 
 logger.addHandler(handler)
 logger.addHandler(consoleHandler)
-
 
 __all__ = ["logger"]

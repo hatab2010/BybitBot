@@ -6,12 +6,12 @@ from typing import Union, Optional
 from pybit.unified_trading import WebSocket
 
 from api import BybitClient
+from core.log import logger
 from schemas.order import Order
 from domain_models import Side, TradeRange
 from services.bot.order_manager import OrderManager
 from .socket_bridges import TickerBridge, OrderbookBridge
-from services.bot.triggers import TimeRangeTrigger
-from core.log import logger
+from services.bot.triggers import TimeRangeTrigger, OrderbookTrigger
 
 
 @dataclass
@@ -38,31 +38,39 @@ class SocketBridgesHub:
 
 
 class BybitBotService:
-    __trigger: TimeRangeTrigger
+    __time_trigger: TimeRangeTrigger
+    __orderbook_trigger: OrderbookTrigger
     __symbol_info: SymbolInfo
     __ticker_socket: WebSocket
     __trigger_time: int
     __is_overlap_sell_price: bool
-    __is_order_process: bool
+    __is_order_placement_in_progress: bool
+    __client: BybitClient
 
     __order_manager: OrderManager
     __options: BotOptions
+
+    __ticker_bridge: TickerBridge
 
     def __init__(
             self,
             symbol: str,
             options: BotOptions,
             client: BybitClient,
-            trigger: TimeRangeTrigger
+            orderbook_trigger: OrderbookTrigger,
+            time_trigger: TimeRangeTrigger,
+            bridge_hub: SocketBridgesHub
     ):
         self.__order_manager = OrderManager(symbol=options.symbol, category=options.category, client=client)
-        self.__order_manager.on_order_filled = self.on_order_filled
+        self.__order_manager.on_order_filled = self.__on_order_filled
         self.__options = options
-        self.__is_order_process = False
-        self.__trigger = trigger
+        self.__is_order_placement_in_progress = False
+        self.__time_trigger = time_trigger
         self.__is_overlap_sell_price = self.__options.allow_range.sell == self.__options.trade_range.sell
 
-        trigger.on_triggered = self.__offset_trade_range
+        # time_trigger.on_triggered = self.__offset_trade_range
+        time_trigger.on_triggered = self.__on_time_trigger
+        orderbook_trigger.on_triggered = self.__on_orderbook_trigger
         self.set_symbol(options.symbol)
 
     def set_symbol(self, symbol: str):
@@ -70,10 +78,9 @@ class BybitBotService:
         self.__symbol_info = SymbolInfo(symbol, tick_size, None)
         self.__order_manager.exit()
         self.__order_manager = OrderManager(self.__client, symbol, self.__options.category)
-        self.__client.websocket.ticker.stream(symbol, "spot", self.__ticker_handler)
 
     def set_orders_count(self, count: int, side: Side):
-        need_to_create = count - len(self.__order_manager.__open_orders)
+        need_to_create = count - len(self.__order_manager.open_orders)
         price = self.__options.trade_range.buy if side == Side.Buy else self.__options.trade_range.sell
 
         if need_to_create > 0:
@@ -85,6 +92,16 @@ class BybitBotService:
                     price=price,
                     qty=self.__options.qty
                 )
+
+    def __on_time_trigger(self, side: Side):
+        self.__offset_trade_range(side)
+
+    def __on_orderbook_trigger(self, side: Side):
+        if side == Side.Buy:
+            self.__offset_trade_range(Side.Buy)
+
+    def __on_order_filled(self, order: Order):
+        self.__create_orders_while_possible(order.side)
 
     def __two_side_create_orders(self):
         print("VALIDATE ORDERS")
@@ -113,60 +130,46 @@ class BybitBotService:
         self.__is_overlap_sell_price = self.__options.allow_range.sell == self.__options.trade_range.sell
 
         self.__amend_all_orders(direction)
-        self.__trigger.set_range_and_restart(self.__options.trade_range)
+
+        # Обновляем значение триггеров
+        self.__time_trigger.set_range_and_restart(self.__options.trade_range)
+        self.__orderbook_trigger.set_range_and_restart(self.__options.trade_range)
 
     def __amend_all_orders(self, side: Side):
         print(f"Amend all orders in side {side.value}")
         price = self.__options.trade_range.buy if side == Side.Buy else self.__options.trade_range.sell
         self.__order_manager.amend_all_orders(side=side, price=price)
 
-    def on_order_filled(self, order: Order):
-        self.__create_orders_while_possible(order.side)
-
     def __create_orders_while_possible(self, side: Union[str, Side]):
-        if self.__is_order_process:
+
+        if self.__is_order_placement_in_progress:
             return
 
-        self.__is_order_process = True
-        last_open_order = None
+        self.__is_order_placement_in_progress = True
 
-        while True:
-            try:
-                # Выполнен ордер на закупку
-                if side == Side.Buy:
-                    # Меняем цену продажи на верхней границе торгового коридора
-                    if self.__is_overlap_sell_price:
-                        ctx_price = self.__overlap_top_price
-                    else:
-                        ctx_price = self.__trade_range.sell
-                    ctx_side = Side.Sell.value
-                # Выполнен ордер на продажу
-                else:
-                    ctx_price = self.__trade_range.buy
-                    ctx_side = Side.Buy.value
+        if side == Side.Sell:
+            # Меняем цену продажи на верхней границе торгового коридора
+            if self.__is_overlap_sell_price:
+                price = self.__options.overlap_top_price
+            else:
+                price = self.__options.trade_range.sell
+            # ctx_side = Side.Sell.value
+        else:
+            price = self.__options.trade_range.buy
+            # ctx_side = Side.Buy.value
 
-                open_order = self.__client.place_order(
-                    symbol=self.__symbol_info.symbol,
-                    side=ctx_side,
-                    price=ctx_price,
-                    orderType="Limit",
-                    timeInForce="GTC",
-                    category="spot",
-                    qty=self.__qty
-                )
+        if type(side) is Side:
+            side = side.value
 
-                last_open_order = open_order
-            except Exception as ex:
-                if last_open_order is not None and side == Side.Sell:
-                    self.__client.cancel_order(
-                        category="spot",
-                        symbol=self.__symbol_info.symbol,
-                        orderId=last_open_order.order_id
-                    )
-                self.__is_order_process = False
-                print(f"ошибка. {ex}")
-                break
+        self.__order_manager.place_orders_while_possible(
+            symbol=self.__symbol_info.symbol,
+            side=str(side),
+            price=price,
+            orderType="Limit",
+            timeInForce="GTC",
+            category="spot",
+            qty=self.__options.qty
+        )
+        self.__order_manager.cancel_last_order(side)
 
-    # def __ticker_handler(self, response: TickerResponse):
-    #     self.__trigger.__push(Decimal(response.data.lastPrice))
-    #     self.__symbol_info.last_price = response.data.lastPrice
+        self.__is_order_placement_in_progress = False
