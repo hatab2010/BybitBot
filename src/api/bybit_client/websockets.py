@@ -50,6 +50,7 @@ class WebsocketBase(ABC):
 
         if is_normal_message:
             try:
+                logger.debug(data)
                 snapshot = EventMessage(**data)
                 data_parsed = self._parse_obj(snapshot.data)
                 callback(data_parsed)
@@ -120,6 +121,7 @@ class OrderWebsocket(PrivateWebsocket):
         socket.order_stream(callback)
 
     def _parse_obj(self, data):
+        data = data[0]
         return Order(**data)
 
 

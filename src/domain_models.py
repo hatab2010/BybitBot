@@ -8,17 +8,36 @@ class OrderStatus(str, Enum):
     New = "New",
     Cancelled = "Cancelled"
 
+    def __str__(self):
+        return self.value
+
+
+class CoinType(str, Enum):
+    USDT = "USDT",
+    USDC = "USDC"
+
+    def __str__(self):
+        return self.value
+
+
+# class Direction(str, Enum):
+#     Up = "Up",
+#     Down = "Down"
+
 
 class Side(str, Enum):
     Buy = "Buy",
     Sell = "Sell"
+
+    def __str__(self):
+        return self.value
 
 
 class TradeRange:
     __sell: Decimal
     __buy: Decimal
 
-    def __init__(self, sell: Decimal, buy: Decimal):
+    def __init__(self, buy: Decimal, sell: Decimal):
         self.__buy = buy
         self.__sell = sell
 

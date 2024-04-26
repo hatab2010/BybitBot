@@ -1,8 +1,11 @@
 import inspect
-from typing import Any
-
+from typing import Any, Optional
 from pybit.unified_trading import HTTP
+from pydantic import ValidationError
+from core.log import logger
 
+from domain_models import CoinType
+from schemas.account_coin import Coin, Account
 from schemas.webcallbacks import APIResponse
 from .websockets import BybitWebsocketClient
 from data import InstrumentInfo
@@ -57,9 +60,11 @@ class BybitClient:
 
         response = self.__session.place_order(**kwargs)
         result = BybitHandler.rest_handler(response)
-        result.update({key: kwargs[key] for key in needed_keys})
+        result.update({key: str(kwargs[key]) for key in needed_keys})
+        result["orderStatus"] = "New"
 
-        print(f"(place order) {result}")
+        logger.info(f"(place order) {result}")
+
         return Order(**result)
 
     def get_open_orders(self, symbol: str, category: str) -> [Order]:
@@ -68,21 +73,23 @@ class BybitClient:
 
         while True:
             response = self.__session.get_open_orders(
-                category=category,
                 symbol=symbol,
-                limit=50,
-                cursor=cursor
+                category=category,
+                cursor=cursor,
+                limit=50
             )
 
             book = BybitHandler.rest_handler(response)
             order_book = Book(**book)
 
-            result.extend(Order.parse_obj(item) for item in order_book.list)
+            result.extend(Order(**item) for item in order_book.list)
 
             if not order_book.next_page_cursor:
                 break
 
             cursor = order_book.next_page_cursor
+
+        logger.info(f"(get open orders) {result}")
 
         return result
 
@@ -108,6 +115,21 @@ class BybitClient:
 
         return result
 
+    def wallet_balance(self, coin_name: CoinType) -> Optional[Coin]:
+        response = self.__session.get_wallet_balance(
+            accountType="UNIFIED",  # хардкод
+        )
+
+        result = BybitHandler.rest_handler(response)
+        account = result["list"][0]
+        logger.info(account)
+        account = Account(**account)
+        coin = next((item for item in account.coins if item.coin == coin_name), None)
+
+        logger.info(f"(get wallet balance) {coin}")
+
+        return coin
+
     def get_instrument_info(self, symbol: str, category: str) -> InstrumentInfo:
         response = self.__session.get_instruments_info(
             category=category,
@@ -125,12 +147,12 @@ class BybitClient:
     def amend_order(self, **kwargs):
         response = self.__session.amend_order(**kwargs)
         result = BybitHandler.rest_handler(response)
-        print(f"(amend order) {result}")
+        logger.info(f"(amend order) {result}")
 
     def cancel_all_orders(self, category: str) -> [OrderEntity]:
         response = self.__session.cancel_all_orders(category=category)
         result = BybitHandler.rest_handler(response)
-        return [OrderEntity(**item) for item in result]
+        return [OrderEntity(**item) for item in result["list"]]
 
     def get_orderbook(self, **kwargs) -> Orderbook:
         response = self.__session.get_orderbook(**kwargs)

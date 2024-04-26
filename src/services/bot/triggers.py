@@ -22,6 +22,10 @@ class TradeTriggerBase(ABC):
     def set_range_and_restart(self, target_range: TradeRange):
         pass
 
+    @abstractmethod
+    def reset(self):
+        pass
+
 
 class TimeRangeTrigger(TradeTriggerBase):
     __top_range: TradeRange
@@ -52,16 +56,16 @@ class TimeRangeTrigger(TradeTriggerBase):
         accept_height = target_range.height
         r_top_top = target_range.sell + accept_height
         r_top_bottom = r_top_top - accept_height
-        self.__top_range = TradeRange(r_top_top, r_top_bottom)
+        self.__top_range = TradeRange(r_top_bottom, r_top_top)
         r_bottom_top = target_range.buy
         r_bottom_bottom = r_bottom_top - accept_height
-        self.__bottom_range = TradeRange(r_bottom_top, r_bottom_bottom)
-        logger.info(f"{datetime.now()} SET TRIGGER AREA\n"
-                    f"BUY in:{r_top_top} out:{r_top_bottom}\n"
-                    f"SELL in:{r_bottom_bottom} out:{r_bottom_top}")
+        self.__bottom_range = TradeRange(r_bottom_bottom, r_bottom_top)
+        logger.info(f"{datetime.now()} SET TRIGGER AREA "
+                    f"BUY [{r_top_top},{r_top_bottom}] "
+                    f"SELL [{r_bottom_bottom} out:{r_bottom_top}]")
         self.reset()
 
-    def __push(self, ticker: Ticker) -> None:
+    def __push(self, ticker: Ticker):
         is_trigger_start = self.__timer is not None
         if is_trigger_start:
             self.__values.append(ticker.last_price)
@@ -74,36 +78,38 @@ class TimeRangeTrigger(TradeTriggerBase):
 
                 if ticker.last_price >= self.__top_range.buy:
                     self.__side = Side.Sell
-                    trigger_duration = self.__trigger_duration_buy
+                    trigger_duration = self.__trigger_duration_sell
                 else:
                     self.__side = Side.Buy
-                    trigger_duration = self.__trigger_duration_sell
+                    trigger_duration = self.__trigger_duration_buy
 
                 self.__values.append(ticker.last_price)
                 self.__timer = Timer(trigger_duration, self.__trigger)
                 self.__timer.start()
-                logger.info(f"{datetime.now()} TRIGGER START\n"
+                logger.info(f"TRIGGER TIME START\n"
                             f"side:{self.__side.value} price:{ticker.last_price}")
 
-        is_outside_top_trigger_area = self.__side == Side.Buy and ticker.last_price < self.__top_range.buy
-        is_outside_bottom_trigger_area = self.__side == Side.Sell and ticker.last_price > self.__bottom_range.sell
+        is_outside_top_trigger_area = self.__side == Side.Sell and ticker.last_price < self.__top_range.buy
+        is_outside_bottom_trigger_area = self.__side == Side.Buy and ticker.last_price > self.__bottom_range.sell
         if is_trigger_start and (is_outside_top_trigger_area or is_outside_bottom_trigger_area):
-            logger.info(f"{datetime.now()} TRIGGER STOP\n"
+            logger.info(f"TRIGGER TIME STOP "
                         f"side:{self.__side.value} price:{ticker.last_price}")
             self.reset()
 
     def __trigger(self):
         average_price = sum(self.__values) / len(self.__values)
-        logger.info("TRIGGER\n"
+        logger.info("TRIGGER TIME VALIDATE "
                     f"average_price:{average_price}")
 
-        if self.__side == Side.Buy:
+        if self.__side == Side.Sell:
             offset_top = self.__top_range.sell - average_price
             offset_bottom = average_price - self.__top_range.buy
 
             if offset_top < offset_bottom or average_price >= self.__top_range.sell:
                 if self.on_triggered:
                     self.on_triggered(self.__side)
+                    logger.info("TRIGGER TIME SUCCESS "
+                                f"average_price:{average_price}")
                     self.reset()
             else:
                 self.reset()
@@ -154,9 +160,9 @@ class OrderbookTrigger(TradeTriggerBase):
         logger.info(
             f"Установлен orderbook триггер на TradeRange{str(trade_range)} size[{self.__min_bid_size}, {self.__min_ask_size}]")
         self.__trade_range = trade_range
-        self.restart()
+        self.reset()
 
-    def restart(self):
+    def reset(self):
         self.__is_triggered = False
 
     def __orderbook_handler(self, orderbook: Orderbook):

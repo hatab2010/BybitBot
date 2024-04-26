@@ -42,7 +42,7 @@ logging.addLevelName(TRACE_LEVEL_NUM, 'TRACE')
 logging.Logger.trace = trace
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования
+logger.setLevel(logging.INFO)  # Устанавливаем уровень логирования
 
 # Создаем хэндлер, который будет писать логи в файл и разделять их по дням
 handler = TimedRotatingFileHandler(

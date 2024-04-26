@@ -6,7 +6,7 @@ class DomainException(ABC, Exception):
     pass
 
 
-class TriggerException(ABC, DomainException):
+class TriggerException(DomainException):
     pass
 
 
