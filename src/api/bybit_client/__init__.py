@@ -117,7 +117,7 @@ class BybitClient:
 
     def wallet_balance(self, coin_name: CoinType) -> Optional[Coin]:
         response = self.__session.get_wallet_balance(
-            accountType="UNIFIED",  # хардкод
+            accountType="UNIFIED",  # TODO хардкод
         )
 
         result = BybitHandler.rest_handler(response)

@@ -40,8 +40,6 @@ target_range = get_market_trade_range(
     category="spot"
 )
 
-target_range.offset(2)
-
 orderbook_bridge = OrderbookBridge(
     symbol=settings.symbol,
     client=client,

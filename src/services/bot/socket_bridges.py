@@ -67,9 +67,8 @@ class OrderBridge(SocketBridgeBase):
     def message_event(self) -> OrderEvent:
         return self._message_event
 
-    def __handler(self, order: Order):
-        print(order)
-        self._message_event._fire(order)
+    def __handler(self, orders: [Order]):
+        self._message_event._fire(orders)
 
     def _impl(self):
         self._socket = self._client.websocket.order.stream(self._symbol, self._channel_type, self.__handler)

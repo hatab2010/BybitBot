@@ -158,7 +158,7 @@ class OrderbookTrigger(TradeTriggerBase):
 
     def set_range_and_restart(self, trade_range: TradeRange):
         logger.info(
-            f"Установлен orderbook триггер на TradeRange{str(trade_range)} size[{self.__min_bid_size}, {self.__min_ask_size}]")
+            f"Установлен trade_range: {str(trade_range)} size[{self.__min_bid_size}, {self.__min_ask_size}]")
         self.__trade_range = trade_range
         self.reset()
 
@@ -182,6 +182,7 @@ class OrderbookTrigger(TradeTriggerBase):
         if size <= min_size:
             self.__is_triggered = True
             if self.on_triggered:
+                logger.info(f"Сработал триггер side:{side} min_size:{min_size} size:{size}")
                 self.on_triggered(side)
 
     def __validate_trade_range(self, orderbook: Orderbook) -> bool:

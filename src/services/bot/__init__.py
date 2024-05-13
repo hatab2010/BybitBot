@@ -83,29 +83,27 @@ class BybitBotService:
         self.__symbol_info = SymbolInfo(self.__options.symbol, tick_size, None)
         # TODO order_manager.set_symbol()
 
-    # def set_orders_count(self, count: int, side: Side):
-    #     need_to_create = count - len(self.__order_manager.open_orders)
-    #     price = self.__options.trade_range.buy if side == Side.Buy else self.__options.trade_range.sell
-    #
-    #     if need_to_create > 0:
-    #         for index in range(need_to_create):
-    #             self.__order_manager.place_order(
-    #                 category="spot",
-    #                 symbol=self.__symbol_info.symbol,
-    #                 side=str(side.value),
-    #                 price=price,
-    #                 qty=self.__options.qty
-    #             )
+    def __on_time_trigger(self, direction: Side):
+        self.__offset_trade_range(direction)
 
-    def __on_time_trigger(self, side: Side):
-        self.__offset_trade_range(side)
+        if direction == direction.Sell:
+            self.__amend_all_orders(Side.Buy)
+        else:
+            self.__order_manager.sell_all(price_per_unit=self.__options.trade_range.sell, symbol=self.__options.symbol)
 
     def __on_orderbook_trigger(self, side: Side):
         if side == Side.Buy:
             self.__offset_trade_range(Side.Buy)
+            self.__order_manager.sell_all(price_per_unit=self.__options.trade_range.sell, symbol=self.__options.symbol)
+            self.__two_side_create_orders()
 
     def __on_order_filled(self, order: Order):
-        self.__create_orders_while_possible(order.side)
+        if order.side == Side.Sell:
+            side = Side.Buy
+        else:
+            side = Side.Sell
+
+        self.__create_orders_while_possible(side)
 
     def __two_side_create_orders(self):
         self.__create_orders_while_possible(Side.Buy)
@@ -126,8 +124,6 @@ class BybitBotService:
         self.__options.trade_range.offset(trade_offset)
 
         logger.info(f"new trade_range [{self.__options.trade_range.buy},{self.__options.trade_range.sell}]")
-
-        self.__amend_all_orders(direction)
 
         # Обновляем значение триггеров
         self.__time_trigger.set_range_and_restart(self.__options.trade_range)

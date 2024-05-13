@@ -12,4 +12,3 @@ class Ticker(BaseModel):
     volume_24h: Decimal = Field(..., alias='volume24h')
     turnover_24h: Decimal = Field(..., alias='turnover24h')
     price_change_percent_24h: str = Field(..., alias='price24hPcnt')
-    usd_index_price: Decimal = Field(..., alias='usdIndexPrice')

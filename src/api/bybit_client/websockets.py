@@ -25,6 +25,7 @@ class WebsocketBase(ABC):
             operation_callback: Optional[Callable[[SocketOperation], None]] = None
     ) -> WebSocket:
         def wrapped_callback(data):
+            logger.trace(f"{data}")
             self.__validate_and_forward(data, callback, operation_callback)
 
         self.__socket = self._create_socket(channel_type, self.__is_testnet)
@@ -46,11 +47,10 @@ class WebsocketBase(ABC):
                 return
             except Exception as ex:
                 logger.critical(ex, exc_info=True)
-                raise ex
+                # raise ex
 
         if is_normal_message:
             try:
-                logger.debug(data)
                 snapshot = EventMessage(**data)
                 data_parsed = self._parse_obj(snapshot.data)
                 callback(data_parsed)
@@ -59,7 +59,7 @@ class WebsocketBase(ABC):
                 return
             except Exception as ex:
                 logger.critical(ex, exc_info=True)
-                raise ex
+                # raise ex
 
     def _create_socket(self, channel_type, is_testnet) -> WebSocket:
         return WebSocket(testnet=is_testnet, channel_type=channel_type)
@@ -121,8 +121,12 @@ class OrderWebsocket(PrivateWebsocket):
         socket.order_stream(callback)
 
     def _parse_obj(self, data):
-        data = data[0]
-        return Order(**data)
+        logger.debug(data)
+        result = []
+        for item in data:
+            result.append(Order(**item))
+
+        return result
 
 
 class BybitWebsocketClient:

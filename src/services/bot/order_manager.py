@@ -59,10 +59,18 @@ class OrderManager:
     def cancel_last_order(self, side: Side):
         exist_orders = [order for order in self.__open_orders if order.side == side]
 
-        if exist_orders:
-            cancel_order_id = exist_orders[-1].order_id
+        if not exist_orders:
+            return
+
+        cancel_order_id = exist_orders[-1].order_id
+
+        try:
             self.__client.cancel_order(category=self.__category, orderId=cancel_order_id, symbol=self.__symbol)
             self.__open_orders.remove(exist_orders[-1])
+            logger.info(f"(cancel last order) {exist_orders[-1]}")
+
+        except Exception as ex:
+            logger.warning(ex)
 
     def amend_all_orders(self, side: Side, price: Decimal):
         # Из-за возможных разрывов соединения WebSocket необходимо актуализировать информацию
@@ -101,36 +109,49 @@ class OrderManager:
 
         self.__client.cancel_all_orders(category=self.__category)
         self.__open_orders = list()
-        qty = self.__client.wallet_balance(base_coin).equity
+        base_coin_balance = self.__client.wallet_balance(base_coin)
+
+        if not base_coin_balance:
+            return
 
         placed_order = self.__client.place_order(
             symbol=self.__symbol,
             orderType="Limit",
             category=self.__category,
             price=price_per_unit,
-            qty=qty,
+            qty=base_coin_balance.equity,
             side=Side.Sell
         )
 
         self.__open_orders = [placed_order]
 
-    def __on_order_state_change(self, order: Order):
-        if order.status == OrderStatus.Filled:
-            self.__open_orders = [item for item in self.__open_orders if item.order_id != order.order_id]
-            self.on_order_filled(order)
+    def __on_order_state_change(self, orders: [Order]):
+        # for order in orders:
+        #     if order.status == OrderStatus.Filled:
+        #         self.__open_orders = [item for item in self.__open_orders if item.order_id != order.order_id]
+        #         self.on_order_filled(order)
+
+        # TODO заплатка
+        for order in orders:
+            if order.status == OrderStatus.Filled:
+                self.__open_orders = [item for item in self.__open_orders if item.order_id != order.order_id]
+                self.on_order_filled(order)
+            break
 
     def __reload_open_orders(self):
         self.__open_orders = self.__client.get_open_orders(category=self.__category, symbol=self.__symbol)
 
-    def __order_stream_handler(self, order: Order):
-        is_order_filled = order.status == OrderStatus.Filled
-        is_order_canceled = order.status == OrderStatus.Cancelled
+    def __order_stream_handler(self, orders: [Order]):
+        for order in orders:
+            is_order_filled = order.status == OrderStatus.Filled
+            is_order_canceled = order.status == OrderStatus.Cancelled
 
-        if is_order_filled or is_order_canceled:
-            self.__open_orders = [item for item in self.__open_orders if item.order_id != order.order_id]
+            if is_order_filled or is_order_canceled:
+                self.__open_orders = [item for item in self.__open_orders if item.order_id != order.order_id]
 
-        if is_order_filled and self.on_order_filled:
-            self.on_order_filled(order)
+            if is_order_filled and self.on_order_filled:
+                self.on_order_filled(order)
+            break # TODO заплатка
 
     def __socket_operation_handler(self, operation: SocketOperation):
         is_success_subscription = operation.op == "subscribe" and operation.success is True
