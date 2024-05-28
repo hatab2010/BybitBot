@@ -156,10 +156,10 @@ class BybitClient:
         result = BybitHandler.rest_handler(response)
         logger.info(f"(amend order) {result}")
 
-    def cancel_all_orders(self, category: str) -> [OrderEntity]:
+    def cancel_all_orders(self, category: str):
         response = self.__session.cancel_all_orders(category=category)
         result = BybitHandler.rest_handler(response)
-        return [OrderEntity(**item) for item in result["list"]]
+        # return [OrderEntity(**item) for item in result["list"]]
 
     def get_orderbook(self, **kwargs) -> Orderbook:
         response = self.__session.get_orderbook(**kwargs)

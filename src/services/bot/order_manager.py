@@ -46,15 +46,18 @@ class OrderManager:
         cancel_order_entity = self.__client.cancel_order(**kwargs)
         self.__open_orders = [order for order in self.__open_orders if order.order_id != cancel_order_entity.order_id]
 
-    def place_orders_while_possible(self, **kwargs):
+    def place_orders_while_possible(self, **kwargs) -> bool:
+        is_success = False
+
         while True:
             try:
                 open_order = self.__client.place_order(**kwargs)
                 self.__open_orders.append(open_order)
+                is_success = True
             # TODO типизировать ошибку
             except Exception as ex:
                 logger.warning(f"Ошибка. {ex}")
-                break
+                return is_success
 
     def cancel_last_order(self, side: Side):
         exist_orders = [order for order in self.__open_orders if order.side == side]

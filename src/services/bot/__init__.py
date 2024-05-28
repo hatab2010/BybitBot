@@ -154,7 +154,7 @@ class BybitBotService:
         else:
             price = self.__options.trade_range.buy
 
-        self.__order_manager.place_orders_while_possible(
+        is_success = self.__order_manager.place_orders_while_possible(
             symbol=self.__symbol_info.symbol,
             side=str(side),
             price=price,
@@ -163,6 +163,8 @@ class BybitBotService:
             category="spot",
             qty=self.__options.qty
         )
-        self.__order_manager.cancel_last_order(side)
+
+        if is_success:
+            self.__order_manager.cancel_last_order(side)
 
         self.__is_order_placement_in_progress = False
