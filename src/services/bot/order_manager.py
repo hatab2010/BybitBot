@@ -119,7 +119,7 @@ class OrderManager:
             orderType="Limit",
             category=self.__category,
             price=price_per_unit,
-            qty=base_coin_balance.equity,
+            qty=base_coin_balance.wallet_balance,
             side=Side.Sell
         )
 

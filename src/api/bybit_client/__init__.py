@@ -117,13 +117,20 @@ class BybitClient:
 
     def wallet_balance(self, coin_name: CoinType) -> Optional[Coin]:
         response = self.__session.get_wallet_balance(
-            accountType="UNIFIED",  # TODO хардкод
+            accountType="SPOT",  # TODO хардкод
         )
 
         result = BybitHandler.rest_handler(response)
         account = result["list"][0]
         logger.info(account)
-        account = Account(**account)
+
+        # TODO вынести валидацию
+        try:
+            account = Account(**account)
+        except ValidationError as ex:
+            logger.error(f"Ошибка валидации. {ex.errors()}")
+            raise ex
+
         coin = next((item for item in account.coins if item.coin == coin_name), None)
 
         logger.info(f"(get wallet balance) {coin}")
