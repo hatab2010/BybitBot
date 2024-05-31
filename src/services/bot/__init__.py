@@ -89,12 +89,22 @@ class BybitBotService:
         if direction == direction.Sell:
             self.__amend_all_orders(Side.Buy)
         else:
-            self.__order_manager.sell_all(price_per_unit=self.__options.trade_range.sell, symbol=self.__options.symbol)
+            try:
+                self.__order_manager.sell_all(price_per_unit=self.__options.trade_range.sell, symbol=self.__options.symbol)
+            except Exception as ex:
+                logger.error(ex, exc_info=True)
+
+        self.__two_side_create_orders()
 
     def __on_orderbook_trigger(self, side: Side):
         if side == Side.Buy:
-            self.__offset_trade_range(Side.Buy)
-            self.__order_manager.sell_all(price_per_unit=self.__options.trade_range.sell, symbol=self.__options.symbol)
+            self.__offset_trade_range(side)
+            try:
+                self.__order_manager.sell_all(price_per_unit=self.__options.trade_range.sell,
+                                              symbol=self.__options.symbol)
+            except Exception as ex:
+                logger.error(ex, exc_info=True)
+
             self.__two_side_create_orders()
 
     def __on_order_filled(self, order: Order):

@@ -1,3 +1,4 @@
+import time
 from decimal import Decimal
 from typing import List, Callable, Optional, Union
 
@@ -117,16 +118,27 @@ class OrderManager:
         if not base_coin_balance:
             return
 
-        placed_order = self.__client.place_order(
-            symbol=self.__symbol,
-            orderType="Limit",
-            category=self.__category,
-            price=price_per_unit,
-            qty=base_coin_balance.wallet_balance,
-            side=Side.Sell
-        )
+        MAX_RETRY_COUNT = 20
+        retry_count = 0
 
-        self.__open_orders = [placed_order]
+        while retry_count < MAX_RETRY_COUNT:
+            try:
+                placed_order = self.__client.place_order(
+                    symbol=self.__symbol,
+                    orderType="Limit",
+                    category=self.__category,
+                    price=price_per_unit,
+                    qty=base_coin_balance.wallet_balance,
+                    side=Side.Sell
+                )
+                self.__open_orders = [placed_order]
+                break
+            except Exception as ex:
+                logger.warning(ex)
+                time.sleep(0.05)
+            finally:
+                retry_count += 1
+
 
     def __on_order_state_change(self, orders: [Order]):
         # for order in orders:

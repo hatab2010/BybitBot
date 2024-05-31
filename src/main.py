@@ -25,10 +25,6 @@ def get_market_trade_range(symbol: str, category: str) -> TradeRange:
 with open("settings.json", "r") as file:
     settingText = file.read()
 settings = Setting(**json.loads(settingText))
-if settings.side == 0:
-    side = Side.Buy
-else:
-    side = Side.Sell
 
 client = BybitClient(
     key=settings.key,
@@ -95,6 +91,8 @@ bot = BybitBotService(
 #     symbol=settings.symbol,
 #     category="spot"
 # )
+#
+# manager.sell_all(Decimal("1.0005"), "USDCUSDT")
 
 
 while True:

@@ -120,6 +120,8 @@ class BybitClient:
             accountType="SPOT",  # TODO хардкод
         )
 
+        logger.info(f"(wallet_balance){response}")
+
         result = BybitHandler.rest_handler(response)
         account = result["list"][0]
         logger.info(account)
@@ -133,7 +135,7 @@ class BybitClient:
 
         coin = next((item for item in account.coins if item.coin == coin_name), None)
 
-        logger.info(f"(get wallet balance) {coin}")
+        logger.info(f"(current coin) {coin}")
 
         return coin
 
