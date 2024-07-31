@@ -126,3 +126,7 @@ dmypy.json
 .idea/
 
 src/settings.json
+
+src/logs/
+
+src/settings(dump).json
